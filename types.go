@@ -1,4 +1,4 @@
-package rohon
+package rhmonitor4go
 
 type Reason uint16
 

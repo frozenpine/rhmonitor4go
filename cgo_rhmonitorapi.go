@@ -1,8 +1,8 @@
-package rohon
+package rhmonitor4go
 
 /*
-#cgo CFLAGS: -I${SRCDIR}/../cRHMonitorApi -I${SRCDIR}/../includes/rohon
-#cgo LDFLAGS: -L${SRCDIR}/../libs/rohon -lcRHMonitorApi
+#cgo CFLAGS: -I${SRCDIR}/include
+#cgo LDFLAGS: -L${SRCDIR}/libs -lcRHMonitorApi
 
 #include "cRHMonitorApi.h"
 */

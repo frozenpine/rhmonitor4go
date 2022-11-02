@@ -6,15 +6,18 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/frozenpine/cRiskApi/rohon"
+	rohon "github.com/frozenpine/rhmonitor4go"
 )
 
 var (
-	remoteAddr = "129.211.138.170"
-	remotePort = 20002
-	riskUser   = "rdcesfk"
-	riskPass   = "888888"
-	brokerID   = "RohonDemo"
+	// remoteAddr = "129.211.138.170"
+	remoteAddr = "210.22.96.58"
+	// remotePort = 20002
+	remotePort = 11102
+	// riskUser   = "rdcesfk"
+	riskUser = "rdfk"
+	riskPass = "888888"
+	brokerID = "RohonDemo"
 )
 
 func init() {

@@ -1,7 +1,7 @@
-package rohon
+package rhmonitor4go
 
 /*
-#cgo CFLAGS: -I${SRCDIR}/../cRHMonitorApi -I${SRCDIR}/../includes/rohon
+#cgo CFLAGS: -I${SRCDIR}/include
 
 #include "cRHMonitorApi.h"
 */
@@ -19,6 +19,10 @@ type RspInfo struct {
 var rspInfoCache = sync.Pool{New: func() any { return &RspInfo{} }}
 
 func NewFromCRHRspInfoField(pRHRspInfoField *C.struct_CRHRspInfoField) *RspInfo {
+	if pRHRspInfoField == nil {
+		return nil
+	}
+
 	rsp := rspInfoCache.Get().(*RspInfo)
 
 	rsp.ErrorID = int(pRHRspInfoField.ErrorID)
@@ -83,6 +87,10 @@ type RspUserLogin struct {
 }
 
 func NewFromCRHMonitorRspUserLoginField(pRspUserLoginField *C.struct_CRHMonitorRspUserLoginField) *RspUserLogin {
+	if pRspUserLoginField == nil {
+		return nil
+	}
+
 	return &RspUserLogin{
 		UserID:            CStr2GoStr(unsafe.Pointer(&pRspUserLoginField.UserID)),
 		PrivilegeType:     PrivilegeType(pRspUserLoginField.PrivilegeType),
@@ -97,6 +105,10 @@ type RspUserLogout struct {
 }
 
 func NewFromCRHMonitorUserLogoutField(pRspUserLoginField *C.struct_CRHMonitorUserLogoutField) *RspUserLogout {
+	if pRspUserLoginField == nil {
+		return nil
+	}
+
 	return &RspUserLogout{
 		UserID: CStr2GoStr(unsafe.Pointer(&pRspUserLoginField.UserID)),
 	}
@@ -152,6 +164,10 @@ func (i Investor) ToCRHMonitorQryInvestorPositionField(instrumentID string) *C.s
 var investorCache = sync.Pool{New: func() any { return &Investor{} }}
 
 func NewFromCRHQryInvestorField(pRspMonitorUser *C.struct_CRHQryInvestorField) *Investor {
+	if pRspMonitorUser == nil {
+		return nil
+	}
+
 	investor := investorCache.Get().(*Investor)
 
 	investor.BrokerID = CStr2GoStr(unsafe.Pointer(&pRspMonitorUser.BrokerID))
@@ -274,7 +290,12 @@ type Account struct {
 var accountCache = sync.Pool{New: func() any { return &Account{} }}
 
 func NewFromCRHTradingAccountField(pRHTradingAccountField *C.struct_CRHTradingAccountField) *Account {
+	if pRHTradingAccountField == nil {
+		return nil
+	}
+
 	account := accountCache.Get().(*Account)
+
 	account.BrokerID = CStr2GoStr(unsafe.Pointer(&pRHTradingAccountField.BrokerID))
 	account.AccountID = CStr2GoStr(unsafe.Pointer(&pRHTradingAccountField.AccountID))
 	account.PreMortgage = float64(pRHTradingAccountField.PreMortgage)
@@ -365,6 +386,10 @@ type Position struct {
 var positionCache = sync.Pool{New: func() any { return &Position{} }}
 
 func NewFromCRHMonitorPositionField(pRHMonitorPositionField *C.struct_CRHMonitorPositionField) *Position {
+	if pRHMonitorPositionField == nil {
+		return nil
+	}
+
 	pos := positionCache.Get().(*Position)
 
 	pos.InvestorID = CStr2GoStr(unsafe.Pointer(&pRHMonitorPositionField.InvestorID))
@@ -406,6 +431,10 @@ type OffsetOrder struct {
 var offsetOrderCache = sync.Pool{New: func() any { return &OffsetOrder{} }}
 
 func NewFromCRHMonitorOffsetOrderField(pMonitorOrderField *C.struct_CRHMonitorOffsetOrderField) *OffsetOrder {
+	if pMonitorOrderField == nil {
+		return nil
+	}
+
 	offsetOrd := offsetOrderCache.Get().(*OffsetOrder)
 
 	offsetOrd.InvestorID = CStr2GoStr(unsafe.Pointer(&pMonitorOrderField.InvestorID))
@@ -491,6 +520,10 @@ type Order struct {
 var orderCache = sync.Pool{New: func() any { return &Order{} }}
 
 func NewFromCRHOrderField(pOrder *C.struct_CRHOrderField) *Order {
+	if pOrder == nil {
+		return nil
+	}
+
 	ord := orderCache.Get().(*Order)
 
 	ord.BrokerID = CStr2GoStr(unsafe.Pointer(&pOrder.BrokerID))
@@ -597,6 +630,10 @@ type Trade struct {
 var tradeCache = sync.Pool{New: func() any { return &Trade{} }}
 
 func NewFromCRHTradeField(pTrade *C.struct_CRHTradeField) *Trade {
+	if pTrade == nil {
+		return nil
+	}
+
 	td := tradeCache.Get().(*Trade)
 
 	td.BrokerID = CStr2GoStr(unsafe.Pointer(&pTrade.BrokerID))

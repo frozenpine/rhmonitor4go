@@ -1,4 +1,4 @@
-module github.com/frozenpine/cRiskApi/rohon
+module github.com/frozenpine/rhmonitor4go
 
 go 1.19
 
