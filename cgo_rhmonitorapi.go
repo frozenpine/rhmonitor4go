@@ -145,7 +145,7 @@ func (api *RHMonitorApi) OnRspUserLogin(login *RspUserLogin, info *RspInfo, requ
 		return
 	}
 
-	log.Printf("User[%s] logged in: %s %s", login.UserID, login.TradingDay, login.LoginTime)
+	log.Printf("User[%s] logged in: %s %s", api.riskUser.UserID, login.TradingDay, login.LoginTime)
 }
 
 func (api *RHMonitorApi) OnRspUserLogout(logout *RspUserLogout, info *RspInfo, requestID int) {
