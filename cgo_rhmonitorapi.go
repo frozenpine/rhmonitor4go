@@ -30,9 +30,9 @@ func CheckRspInfo(info *RspInfo) error {
 	return nil
 }
 
-func printData[T Investor | Account | Order | Trade | Position | OffsetOrder](data *T) {
+func printData[T Investor | Account | Order | Trade | Position | OffsetOrder](inter string, data *T) {
 	if data != nil {
-		fmt.Printf("%s: %+v\n", reflect.TypeOf(data), data)
+		fmt.Printf("%s %s: %+v\n", inter, reflect.TypeOf(data), data)
 	}
 }
 
@@ -261,7 +261,7 @@ func (api *RHMonitorApi) OnRspQryMonitorAccounts(investor *Investor, info *RspIn
 		log.Printf("All monitor account query finished: %d", len(api.investors))
 
 		for _, investor := range api.investors {
-			printData(investor)
+			printData("OnRspQryMonitorAccounts", investor)
 		}
 
 		api.investorReady.CompareAndSwap(false, true)
@@ -274,7 +274,7 @@ func (api *RHMonitorApi) OnRspQryInvestorMoney(account *Account, info *RspInfo, 
 		return
 	}
 
-	printData(account)
+	printData("OnRspQryInvestorMoney", account)
 }
 
 func (api *RHMonitorApi) OnRspQryInvestorPosition(position *Position, info *RspInfo, requestID int, isLast bool) {
@@ -284,7 +284,7 @@ func (api *RHMonitorApi) OnRspQryInvestorPosition(position *Position, info *RspI
 		return
 	}
 
-	printData(position)
+	printData("OnRspQryInvestorPosition", position)
 
 	if isLast {
 		log.Printf("Query investor[%s]'s position finished.", position.InvestorID)
@@ -303,23 +303,23 @@ func (api *RHMonitorApi) OnRspOffsetOrder(offsetOrd *OffsetOrder, info *RspInfo,
 		return
 	}
 
-	printData(offsetOrd)
+	printData("OnRspOffsetOrder", offsetOrd)
 }
 
 func (api *RHMonitorApi) OnRtnOrder(order *Order) {
-	printData(order)
+	printData("OnRtnOrder", order)
 }
 
 func (api *RHMonitorApi) OnRtnTrade(trade *Trade) {
-	printData(trade)
+	printData("OnRtnTrade", trade)
 }
 
 func (api *RHMonitorApi) OnRtnInvestorMoney(account *Account) {
-	printData(account)
+	printData("OnRtnInvestorMoney", account)
 }
 
 func (api *RHMonitorApi) OnRtnInvestorPosition(position *Position) {
-	printData(position)
+	printData("OnRtnInvestorPosition", position)
 }
 
 func NewRHMonitorApi(brokerID, addr string, port int) *RHMonitorApi {
