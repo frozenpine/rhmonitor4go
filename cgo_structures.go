@@ -152,11 +152,13 @@ func (i Investor) ToCRHMonitorQryInvestorPositionField(instrumentID string) *C.s
 		C.sizeof_TRHBrokerIDType-1,
 	)
 
-	C.memcpy(
-		unsafe.Pointer(&data.InstrumentID),
-		unsafe.Pointer(C.CString(instrumentID)),
-		C.sizeof_TRHInstrumentIDType-1,
-	)
+	if instrumentID != "" {
+		C.memcpy(
+			unsafe.Pointer(&data.InstrumentID),
+			unsafe.Pointer(C.CString(instrumentID)),
+			C.sizeof_TRHInstrumentIDType-1,
+		)
+	}
 
 	return &data
 }

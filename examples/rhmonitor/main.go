@@ -41,5 +41,15 @@ func main() {
 
 	api.ReqUserLogin(&login)
 
+	api.ReqQryMonitorAccounts()
+
+	api.ReqQryAllInvestorMoney()
+
+	api.ReqQryAllInvestorPosition()
+
+	api.ReqSubAllInvestorOrder()
+
+	api.ReqSubAllInvestorTrade()
+
 	<-ctx.Done()
 }
