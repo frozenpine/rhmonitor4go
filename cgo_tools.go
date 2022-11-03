@@ -8,7 +8,7 @@ package rhmonitor4go
 import "C"
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"log"
 	"reflect"
 	"unsafe"
@@ -19,7 +19,7 @@ import (
 
 func GbkToUtf8(s []byte) ([]byte, error) {
 	reader := transform.NewReader(bytes.NewReader(s), simplifiedchinese.GBK.NewDecoder())
-	d, e := ioutil.ReadAll(reader)
+	d, e := io.ReadAll(reader)
 	if e != nil {
 		return nil, e
 	}
