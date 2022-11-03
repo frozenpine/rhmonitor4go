@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"reflect"
 	"sync"
 	"sync/atomic"
 
@@ -31,7 +32,7 @@ func CheckRspInfo(info *RspInfo) error {
 
 func printData[T Investor | Account | Order | Trade | Position | OffsetOrder](data *T) {
 	if data != nil {
-		fmt.Printf("RTN: %v", data)
+		fmt.Printf("%s: %+v\n", reflect.TypeOf(data), data)
 	}
 }
 
@@ -145,7 +146,7 @@ func (api *RHMonitorApi) ReqQryAllInvestorPosition() (rtn int) {
 }
 
 func (api *RHMonitorApi) ReqOffsetOrder(offsetOrder *OffsetOrder) int {
-	log.Printf("ReqOffsetOrder not implied: %v", offsetOrder)
+	log.Printf("ReqOffsetOrder not implied: %+v", offsetOrder)
 	return -255
 }
 
@@ -215,7 +216,7 @@ func (api *RHMonitorApi) OnFrontConnected() {
 }
 
 func (api *RHMonitorApi) OnFrontDisconnected(reason Reason) {
-	log.Printf("Rohon risk[%s:%d] disconnected: %v", api.remoteAddr, api.remotePort, reason)
+	log.Printf("Rohon risk[%s:%d] disconnected: %s", api.remoteAddr, api.remotePort, reason)
 	api.isConnected.CompareAndSwap(true, false)
 }
 
@@ -257,7 +258,12 @@ func (api *RHMonitorApi) OnRspQryMonitorAccounts(investor *Investor, info *RspIn
 	api.investors = append(api.investors, investor)
 
 	if isLast {
-		log.Printf("All monitor account query finished: %#v", api.investors)
+		log.Printf("All monitor account query finished: %d", len(api.investors))
+
+		for _, investor := range api.investors {
+			printData(investor)
+		}
+
 		api.investorReady.CompareAndSwap(false, true)
 	}
 }
@@ -273,7 +279,7 @@ func (api *RHMonitorApi) OnRspQryInvestorMoney(account *Account, info *RspInfo, 
 
 func (api *RHMonitorApi) OnRspQryInvestorPosition(position *Position, info *RspInfo, requestID int, isLast bool) {
 	if err := CheckRspInfo(info); err != nil {
-		log.Printf("Investor money query failed: %v", err)
+		log.Printf("Investor position query failed: %v", err)
 
 		return
 	}
