@@ -45,9 +45,9 @@ func main() {
 
 	api.ReqQryAllInvestorMoney()
 
-	api.ReqQryAllInvestorPosition()
+	// api.ReqQryAllInvestorPosition()
 
-	api.ReqSubAllInvestorOrder()
+	// api.ReqSubAllInvestorOrder()
 
 	api.ReqSubAllInvestorTrade()
 

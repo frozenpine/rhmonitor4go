@@ -37,41 +37,45 @@ type RiskUser struct {
 	MACAddress string
 }
 
-func (req RiskUser) ToCRHMonitorReqUserLoginField() *C.struct_CRHMonitorReqUserLoginField {
+func (usr RiskUser) IsValid() bool {
+	return usr.UserID != "" && usr.Password != ""
+}
+
+func (usr RiskUser) ToCRHMonitorReqUserLoginField() *C.struct_CRHMonitorReqUserLoginField {
 	data := C.struct_CRHMonitorReqUserLoginField{}
 
 	C.memcpy(
 		unsafe.Pointer(&data.UserID[0]),
-		unsafe.Pointer(C.CString(req.UserID)),
+		unsafe.Pointer(C.CString(usr.UserID)),
 		C.sizeof_TRHUserIDType-1,
 	)
 	C.memcpy(
 		unsafe.Pointer(&data.Password[0]),
-		unsafe.Pointer(C.CString(req.Password)),
+		unsafe.Pointer(C.CString(usr.Password)),
 		C.sizeof_TRHPasswordType-1,
 	)
 
 	return &data
 }
 
-func (req RiskUser) ToCRHMonitorUserLogoutField() *C.struct_CRHMonitorUserLogoutField {
+func (usr RiskUser) ToCRHMonitorUserLogoutField() *C.struct_CRHMonitorUserLogoutField {
 	data := C.struct_CRHMonitorUserLogoutField{}
 
 	C.memcpy(
 		unsafe.Pointer(&data.UserID),
-		unsafe.Pointer(C.CString(req.UserID)),
+		unsafe.Pointer(C.CString(usr.UserID)),
 		C.sizeof_TRHUserIDType-1,
 	)
 
 	return &data
 }
 
-func (req RiskUser) ToCRHMonitorQryMonitorUser() *C.struct_CRHMonitorQryMonitorUser {
+func (usr RiskUser) ToCRHMonitorQryMonitorUser() *C.struct_CRHMonitorQryMonitorUser {
 	data := C.struct_CRHMonitorQryMonitorUser{}
 
 	C.memcpy(
 		unsafe.Pointer(&data.UserID),
-		unsafe.Pointer(C.CString(req.UserID)),
+		unsafe.Pointer(C.CString(usr.UserID)),
 		C.sizeof_TRHUserIDType-1,
 	)
 

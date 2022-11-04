@@ -213,6 +213,10 @@ func (api *RHMonitorApi) ReqSubAllInvestorTrade() (rtn int) {
 func (api *RHMonitorApi) OnFrontConnected() {
 	log.Printf("Rohon risk[%s:%d] connected.", api.remoteAddr, api.remotePort)
 	api.isConnected.CompareAndSwap(false, true)
+
+	if api.isLogin.Load() && api.riskUser.IsValid() {
+		api.ReqUserLogin(&api.riskUser)
+	}
 }
 
 func (api *RHMonitorApi) OnFrontDisconnected(reason Reason) {
