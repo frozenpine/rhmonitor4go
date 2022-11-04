@@ -47,7 +47,7 @@ type RHMonitorApi struct {
 	isConnected   atomic.Bool
 	isLogin       atomic.Bool
 	investorReady atomic.Bool
-	investors     []*Investor
+	investors     *InvestorCache
 	requestID     int64
 }
 
@@ -108,14 +108,16 @@ func (api *RHMonitorApi) ReqQryInvestorMoney(investor *Investor) int {
 func (api *RHMonitorApi) ReqQryAllInvestorMoney() (rtn int) {
 	api.waitBool(&api.investorReady, true)
 
-	for _, investor := range api.investors {
+	api.investors.ForEach(func(_ string, investor *Investor) bool {
 		rtn = api.ReqQryInvestorMoney(investor)
 
 		if rtn != 0 {
 			log.Printf("Qeury money for user[%s] failed: %d", investor.InvestorID, rtn)
-			break
+			return false
 		}
-	}
+
+		return true
+	})
 
 	return
 }
@@ -133,14 +135,16 @@ func (api *RHMonitorApi) ReqQryInvestorPosition(investor *Investor, instrumentID
 func (api *RHMonitorApi) ReqQryAllInvestorPosition() (rtn int) {
 	api.waitBool(&api.investorReady, true)
 
-	for _, investor := range api.investors {
+	api.investors.ForEach(func(_ string, investor *Investor) bool {
 		rtn = api.ReqQryInvestorPosition(investor, "")
 
 		if rtn != 0 {
 			log.Printf("Qeury postion for user[%s] failed: %d", investor.InvestorID, rtn)
-			break
+			return false
 		}
-	}
+
+		return true
+	})
 
 	return
 }
@@ -173,14 +177,16 @@ func (api *RHMonitorApi) ReqSubInvestorOrder(investor *Investor) int {
 func (api *RHMonitorApi) ReqSubAllInvestorOrder() (rtn int) {
 	api.waitBool(&api.investorReady, true)
 
-	for _, investor := range api.investors {
+	api.investors.ForEach(func(_ string, investor *Investor) bool {
 		rtn = api.ReqSubInvestorOrder(investor)
 
 		if rtn != 0 {
 			log.Printf("Sub investor[%s]'s order failed: %d", investor.InvestorID, rtn)
-			break
+			return false
 		}
-	}
+
+		return true
+	})
 
 	return
 }
@@ -198,14 +204,16 @@ func (api *RHMonitorApi) ReqSubInvestorTrade(investor *Investor) int {
 func (api *RHMonitorApi) ReqSubAllInvestorTrade() (rtn int) {
 	api.waitBool(&api.investorReady, true)
 
-	for _, investor := range api.investors {
+	api.investors.ForEach(func(_ string, investor *Investor) bool {
 		rtn = api.ReqSubInvestorTrade(investor)
 
 		if rtn != 0 {
 			log.Printf("Sub investor[%s]'s trade failed: %d", investor.InvestorID, rtn)
-			break
+			return false
 		}
-	}
+
+		return true
+	})
 
 	return
 }
@@ -259,14 +267,15 @@ func (api *RHMonitorApi) OnRspQryMonitorAccounts(investor *Investor, info *RspIn
 		return
 	}
 
-	api.investors = append(api.investors, investor)
+	api.investors.AddInvestor(investor)
 
 	if isLast {
-		log.Printf("All monitor account query finished: %d", len(api.investors))
+		log.Printf("All monitor account query finished: %d", api.investors.Size())
 
-		for _, investor := range api.investors {
+		api.investors.OrderedForEach(func(_ string, investor *Investor) bool {
 			printData("OnRspQryMonitorAccounts", investor)
-		}
+			return true
+		})
 
 		api.investorReady.CompareAndSwap(false, true)
 	}
@@ -345,6 +354,9 @@ func NewRHMonitorApi(brokerID, addr string, port int) *RHMonitorApi {
 		brokerID:   brokerID,
 		remoteAddr: ip,
 		remotePort: port,
+		investors: &InvestorCache{
+			data: make(map[string]*Investor),
+		},
 	}
 
 	C.SetCallbacks(cApi, &callbacks)
