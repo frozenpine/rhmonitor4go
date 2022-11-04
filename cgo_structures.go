@@ -7,6 +7,7 @@ package rhmonitor4go
 */
 import "C"
 import (
+	"bytes"
 	"sync"
 	"unsafe"
 )
@@ -121,6 +122,19 @@ func NewFromCRHMonitorUserLogoutField(pRspUserLoginField *C.struct_CRHMonitorUse
 type Investor struct {
 	BrokerID   string
 	InvestorID string
+}
+
+func (i Investor) Identity() string {
+	out := bytes.NewBuffer(make([]byte, 0, 30))
+
+	if i.BrokerID != "" {
+		out.WriteString(i.BrokerID)
+		out.WriteString(".")
+	}
+
+	out.WriteString(i.InvestorID)
+
+	return out.String()
 }
 
 func (i Investor) ToCRHMonitorQryInvestorMoneyField() *C.struct_CRHMonitorQryInvestorMoneyField {
@@ -291,6 +305,19 @@ type Account struct {
 	Premium float64
 	//市值权益
 	MarketValueEquity float64
+}
+
+func (acct Account) Identity() string {
+	out := bytes.NewBuffer(make([]byte, 0, 30))
+
+	if acct.BrokerID != "" {
+		out.WriteString(acct.BrokerID)
+		out.WriteString(".")
+	}
+
+	out.WriteString(acct.AccountID)
+
+	return out.String()
 }
 
 var accountCache = sync.Pool{New: func() any { return &Account{} }}
