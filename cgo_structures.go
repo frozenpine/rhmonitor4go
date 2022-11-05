@@ -7,7 +7,7 @@ package rhmonitor4go
 */
 import "C"
 import (
-	"bytes"
+	"strconv"
 	"sync"
 	"unsafe"
 )
@@ -125,7 +125,8 @@ type Investor struct {
 }
 
 func (i Investor) Identity() string {
-	out := bytes.NewBuffer(make([]byte, 0, 30))
+	out := NewStringBuffer()
+	defer out.Release()
 
 	if i.BrokerID != "" {
 		out.WriteString(i.BrokerID)
@@ -308,7 +309,8 @@ type Account struct {
 }
 
 func (acct Account) Identity() string {
-	out := bytes.NewBuffer(make([]byte, 0, 30))
+	out := NewStringBuffer()
+	defer out.Release()
 
 	if acct.BrokerID != "" {
 		out.WriteString(acct.BrokerID)
@@ -414,6 +416,19 @@ type Position struct {
 	FrozenVolume int
 	//信息类型
 	EntryType uint8
+}
+
+func (pos *Position) Identity() string {
+	out := NewStringBuffer()
+	defer out.Release()
+
+	if pos.BrokerID != "" {
+		out.WriteString(pos.BrokerID)
+		out.WriteString(".")
+	}
+	out.WriteString(pos.InvestorID)
+
+	return out.String()
 }
 
 var positionCache = sync.Pool{New: func() any { return &Position{} }}
@@ -624,6 +639,24 @@ func NewFromCRHOrderField(pOrder *C.struct_CRHOrderField) *Order {
 	ord.MACAddress = CStr2GoStr(unsafe.Pointer(&pOrder.MacAddress))
 
 	return ord
+}
+
+func (ord *Order) Identity() string {
+	out := NewStringBuffer()
+	defer out.Release()
+
+	if ord.BrokerID != "" {
+		out.WriteString(ord.BrokerID)
+		out.WriteString(".")
+	}
+
+	out.WriteString(ord.InvestorID)
+	out.WriteString(".")
+	out.WriteString(strconv.Itoa(ord.SessionID))
+	out.WriteString(".")
+	out.WriteString(ord.OrderLocalID)
+
+	return out.String()
 }
 
 type Trade struct {

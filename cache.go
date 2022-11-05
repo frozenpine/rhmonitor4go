@@ -126,7 +126,19 @@ func (req *RequestCache) RedoInvestorReady() (rtn int) {
 }
 
 type InvestorCache struct {
-	data map[string]*Investor
+	data         map[string]*Investor
+	accountCache *AccountCache
+	// positionCache *PositionCache
+}
+
+func NewInvestorCache() *InvestorCache {
+	cache := InvestorCache{
+		data:         make(map[string]*Investor),
+		accountCache: &AccountCache{},
+		// positionCache: &PositionCache{},
+	}
+
+	return &cache
 }
 
 func (cache *InvestorCache) Size() int {
@@ -180,4 +192,13 @@ func (cache *AccountCache) ForEach(fn func(string, *Account) bool) {
 			break
 		}
 	}
+}
+
+type DataCache[T Position | Order | OffsetOrder | Account] struct {
+	data     map[string]*T
+	dataChan *channel.Hub[*T]
+}
+
+func (cache *DataCache[T]) Size() int {
+	return len(cache.data)
 }
