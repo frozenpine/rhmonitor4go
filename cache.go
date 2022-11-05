@@ -1,6 +1,10 @@
 package rhmonitor4go
 
-import "sync/atomic"
+import (
+	"sync/atomic"
+
+	"github.com/frozenpine/channel"
+)
 
 func waitBoolFlag(flag *atomic.Bool, v bool) <-chan struct{} {
 	ch := make(chan struct{})
@@ -150,7 +154,8 @@ func (cache *InvestorCache) ForEach(fn func(string, *Investor) bool) {
 }
 
 type AccountCache struct {
-	data map[string]*Account
+	data     map[string]*Account
+	dataChan *channel.Hub[*Account]
 }
 
 func (cache *AccountCache) Size() int {

@@ -1,3 +1,5 @@
+github.com/frozenpine/channel v0.0.1 h1:3hSuMt08LcLFlWF8NDoYPi3jlM19pc8NMa91mFaWK2g=
+github.com/frozenpine/channel v0.0.1/go.mod h1:ruTCbu/FnVgL7CsZWKP5EibzgkslqghvkhwSPLJEq7I=
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
 github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 golang.org/x/text v0.4.0 h1:BrVqGRd7+k1DiOgtnFvAkoQEWQvBc25ouMJM6429SFg=
