@@ -427,7 +427,7 @@ func (api *RHMonitorApi) OnRtnInvestorPosition(position *Position) {
 	printData("OnRtnInvestorPosition", position)
 }
 
-func (api *RHMonitorApi) Init(brokerID, addr string, port int, spi RHRiskSpi) error {
+func (api *RHMonitorApi) Init(brokerID, addr string, port int) error {
 	if addr == "" || port <= 1024 {
 		return errors.New("rohon remote config is empty")
 	}
@@ -447,11 +447,7 @@ func (api *RHMonitorApi) Init(brokerID, addr string, port int, spi RHRiskSpi) er
 			data: make(map[string]*Investor),
 		}
 
-		if spi == nil {
-			spi = api
-		}
-
-		RegisterRHRiskSpi(api.cInstance, spi)
+		RegisterRHRiskSpi(api.cInstance, api)
 
 		C.Init(api.cInstance, C.CString(ip.String()), C.uint(port))
 	})
@@ -459,10 +455,10 @@ func (api *RHMonitorApi) Init(brokerID, addr string, port int, spi RHRiskSpi) er
 	return nil
 }
 
-func NewRHMonitorApi(brokerID, addr string, port int, spi RHRiskSpi) *RHMonitorApi {
+func NewRHMonitorApi(brokerID, addr string, port int) *RHMonitorApi {
 	api := RHMonitorApi{}
 
-	if err := api.Init(brokerID, addr, port, spi); err != nil {
+	if err := api.Init(brokerID, addr, port); err != nil {
 		log.Printf("Create RHMonitorApi failed: %+v", err)
 		return nil
 	}

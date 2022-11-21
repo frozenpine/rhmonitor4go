@@ -25,7 +25,7 @@ func init() {
 }
 
 func main() {
-	api := rohon.NewRHMonitorApi(brokerID, remoteAddr, remotePort, nil)
+	api := rohon.NewRHMonitorApi(brokerID, remoteAddr, remotePort)
 
 	if api == nil {
 		log.Fatal("Create api instance failed.")
