@@ -427,38 +427,45 @@ func (api *RHMonitorApi) OnRtnInvestorPosition(position *Position) {
 	printData("OnRtnInvestorPosition", position)
 }
 
-func NewRHMonitorApi(brokerID, addr string, port int) *RHMonitorApi {
+func (api *RHMonitorApi) Init(brokerID, addr string, port int, spi RHRiskSpi) error {
 	if addr == "" || port <= 1024 {
-		log.Println("Rohon remote config is empty.")
-		return nil
+		return errors.New("rohon remote config is empty")
 	}
 
 	ip := net.ParseIP(addr)
 	if ip == nil {
-		log.Printf("Invalid remote addr: %s", addr)
+		return errors.Errorf("invalid remote addr: %s", addr)
+	}
+
+	api.initOnce.Do(func() {
+		api.cInstance = C.CreateRHMonitorApi()
+		api.brokerID = brokerID
+		api.remoteAddr = ip
+		api.remotePort = port
+		api.requests = &RequestCache{}
+		api.investors = &InvestorCache{
+			data: make(map[string]*Investor),
+		}
+
+		if spi == nil {
+			spi = api
+		}
+
+		RegisterRHRiskSpi(api.cInstance, spi)
+
+		C.Init(api.cInstance, C.CString(ip.String()), C.uint(port))
+	})
+
+	return nil
+}
+
+func NewRHMonitorApi(brokerID, addr string, port int, spi RHRiskSpi) *RHMonitorApi {
+	api := RHMonitorApi{}
+
+	if err := api.Init(brokerID, addr, port, spi); err != nil {
+		log.Printf("Create RHMonitorApi failed: %+v", err)
 		return nil
 	}
-
-	cApi := C.CreateRHMonitorApi()
-
-	api := RHMonitorApi{
-		cInstance: cApi,
-
-		brokerID:   brokerID,
-		remoteAddr: ip,
-		remotePort: port,
-
-		requests: &RequestCache{},
-		investors: &InvestorCache{
-			data: make(map[string]*Investor),
-		},
-	}
-
-	C.SetCallbacks(cApi, &callbacks)
-
-	instanceCache[cApi] = &api
-
-	C.Init(cApi, C.CString(ip.String()), C.uint(port))
 
 	return &api
 }

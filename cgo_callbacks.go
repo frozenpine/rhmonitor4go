@@ -89,9 +89,9 @@ import (
 )
 
 var (
-	instanceCache = make(map[C.CRHMonitorInstance]*RHMonitorApi)
+	spiCache = make(map[C.CRHMonitorInstance]RHRiskSpi)
 
-	ErrInstanceNotExist = origin_error.New("api instance not found")
+	ErrInstanceNotExist = origin_error.New("spi instance not found")
 
 	callbacks = C.callback_t{
 		cOnFrontConnected:         C.CbOnFrontConnected(C.cgoOnFrontConnected),
@@ -109,10 +109,25 @@ var (
 	}
 )
 
-func getApiInstance(instance C.CRHMonitorInstance) (api *RHMonitorApi) {
+type RHRiskSpi interface {
+	OnFrontConnected()
+	OnFrontDisconnected(reason Reason)
+	OnRspUserLogin(*RspUserLogin, *RspInfo, int)
+	OnRspUserLogout(*RspUserLogout, *RspInfo, int)
+	OnRspQryMonitorAccounts(*Investor, *RspInfo, int, bool)
+	OnRspQryInvestorMoney(*Account, *RspInfo, int, bool)
+	OnRspQryInvestorPosition(*Position, *RspInfo, int, bool)
+	OnRspOffsetOrder(*OffsetOrder, *RspInfo, int, bool)
+	OnRtnOrder(*Order)
+	OnRtnTrade(*Trade)
+	OnRtnInvestorMoney(*Account)
+	OnRtnInvestorPosition(*Position)
+}
+
+func getSpiInstance(instance C.CRHMonitorInstance) (api RHRiskSpi) {
 	var exist bool
 
-	if api, exist = instanceCache[instance]; !exist || api == nil {
+	if api, exist = spiCache[instance]; !exist || api == nil {
 		panic(errors.WithStack(ErrInstanceNotExist))
 	}
 
@@ -121,12 +136,12 @@ func getApiInstance(instance C.CRHMonitorInstance) (api *RHMonitorApi) {
 
 //export cgoOnFrontConnected
 func cgoOnFrontConnected(instance C.CRHMonitorInstance) {
-	getApiInstance(instance).OnFrontConnected()
+	getSpiInstance(instance).OnFrontConnected()
 }
 
 //export cgoOnFrontDisconnected
 func cgoOnFrontDisconnected(instance C.CRHMonitorInstance, nReason C.int) {
-	getApiInstance(instance).OnFrontDisconnected(Reason(nReason))
+	getSpiInstance(instance).OnFrontDisconnected(Reason(nReason))
 }
 
 //export cgoOnRspUserLogin
@@ -139,7 +154,7 @@ func cgoOnRspUserLogin(
 	login := NewFromCRHMonitorRspUserLoginField(pRspUserLoginField)
 	info := NewFromCRHRspInfoField(pRHRspInfoField)
 
-	getApiInstance(instance).OnRspUserLogin(login, info, int(nRequestID))
+	getSpiInstance(instance).OnRspUserLogin(login, info, int(nRequestID))
 }
 
 //export cgoOnRspUserLogout
@@ -151,7 +166,7 @@ func cgoOnRspUserLogout(
 	logout := NewFromCRHMonitorUserLogoutField(pRspUserLoginField)
 	info := NewFromCRHRspInfoField(pRHRspInfoField)
 
-	getApiInstance(instance).OnRspUserLogout(logout, info, int(nRequestID))
+	getSpiInstance(instance).OnRspUserLogout(logout, info, int(nRequestID))
 }
 
 //export cgoOnRspQryMonitorAccounts
@@ -164,7 +179,7 @@ func cgoOnRspQryMonitorAccounts(
 	investor := NewFromCRHQryInvestorField(pRspMonitorUser)
 	info := NewFromCRHRspInfoField(pRHRspInfoField)
 
-	getApiInstance(instance).OnRspQryMonitorAccounts(
+	getSpiInstance(instance).OnRspQryMonitorAccounts(
 		investor, info, int(nRequestID), bool(isLast),
 	)
 }
@@ -179,7 +194,7 @@ func cgoOnRspQryInvestorMoney(
 	account := NewFromCRHTradingAccountField(pRHTradingAccountField)
 	info := NewFromCRHRspInfoField(pRHRspInfoField)
 
-	getApiInstance(instance).OnRspQryInvestorMoney(
+	getSpiInstance(instance).OnRspQryInvestorMoney(
 		account, info, int(nRequestID), bool(isLast),
 	)
 }
@@ -194,7 +209,7 @@ func cgoOnRspQryInvestorPosition(
 	pos := NewFromCRHMonitorPositionField(pRHMonitorPositionField)
 	info := NewFromCRHRspInfoField(pRHRspInfoField)
 
-	getApiInstance(instance).OnRspQryInvestorPosition(
+	getSpiInstance(instance).OnRspQryInvestorPosition(
 		pos, info, int(nRequestID), bool(isLast),
 	)
 }
@@ -209,7 +224,7 @@ func cgoOnRspOffsetOrder(
 	offsetOrd := NewFromCRHMonitorOffsetOrderField(pMonitorOrderField)
 	info := NewFromCRHRspInfoField(pRHRspInfoField)
 
-	getApiInstance(instance).OnRspOffsetOrder(
+	getSpiInstance(instance).OnRspOffsetOrder(
 		offsetOrd, info, int(nRequestID), bool(isLast),
 	)
 }
@@ -220,7 +235,7 @@ func cgoOnRtnOrder(
 ) {
 	ord := NewFromCRHOrderField(pOrder)
 
-	getApiInstance(instance).OnRtnOrder(ord)
+	getSpiInstance(instance).OnRtnOrder(ord)
 }
 
 //export cgoOnRtnTrade
@@ -229,7 +244,7 @@ func cgoOnRtnTrade(
 ) {
 	td := NewFromCRHTradeField(pTrade)
 
-	getApiInstance(instance).OnRtnTrade(td)
+	getSpiInstance(instance).OnRtnTrade(td)
 }
 
 //export cgoOnRtnInvestorMoney
@@ -239,7 +254,7 @@ func cgoOnRtnInvestorMoney(
 ) {
 	acct := NewFromCRHTradingAccountField(pRohonTradingAccountField)
 
-	getApiInstance(instance).OnRtnInvestorMoney(acct)
+	getSpiInstance(instance).OnRtnInvestorMoney(acct)
 }
 
 //export cgoOnRtnInvestorPosition
@@ -249,5 +264,12 @@ func cgoOnRtnInvestorPosition(
 ) {
 	pos := NewFromCRHMonitorPositionField(pRohonMonitorPositionField)
 
-	getApiInstance(instance).OnRtnInvestorPosition(pos)
+	getSpiInstance(instance).OnRtnInvestorPosition(pos)
+}
+
+func RegisterRHRiskSpi(instance C.CRHMonitorInstance, spi RHRiskSpi) {
+	if _, exist := spiCache[instance]; !exist {
+		C.SetCallbacks(instance, &callbacks)
+		spiCache[instance] = spi
+	}
 }
