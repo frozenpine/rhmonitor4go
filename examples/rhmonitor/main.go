@@ -24,12 +24,25 @@ func init() {
 	log.SetFlags(log.Flags() | log.Lmicroseconds)
 }
 
-func main() {
-	api := rohon.NewRHMonitorApi(brokerID, remoteAddr, remotePort)
+type myApi struct {
+	rohon.RHMonitorApi
+}
 
-	if api == nil {
-		log.Fatal("Create api instance failed.")
-	}
+func (api *myApi) OnFrontConnected() {
+	log.Println("MyApi OnFrontConnected called.")
+	api.RHMonitorApi.OnFrontConnected()
+}
+
+func main() {
+	api := &myApi{}
+
+	log.Printf("Instance: %p", api)
+
+	api.Init(brokerID, remoteAddr, remotePort, api)
+
+	// if api == nil {
+	// 	log.Fatal("Create api instance failed.")
+	// }
 
 	ctx := context.Background()
 	signal.NotifyContext(ctx, os.Interrupt, os.Kill)
