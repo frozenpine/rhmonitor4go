@@ -16,6 +16,12 @@ type RHRiskData interface {
 
 type CallbackFn[T RHRiskData] func(*Result[T]) error
 
+// Promise is a future result callback interface
+// Then(), Catch(), Finally() can be called in any order sequence
+//
+// Await() must be last one in the call chain,
+// in order to active an result watcher goroutine
+// to execute callback functions
 type Promise[T RHRiskData] interface {
 	Await()
 	Then(CallbackFn[T]) Promise[T]
@@ -91,22 +97,26 @@ func (r *Result[T]) Await() {
 
 		defer r.finish.Done()
 
-		if r.ExecCode != 0 {
-			return
-		}
-
 		var errors struct {
 			thenErr  error
 			catchErr error
 			finalErr error
 		}
 
-		if r.RspInfo == nil || r.RspInfo.ErrorID == 0 {
-			if r.successFn != nil {
-				errors.thenErr = r.successFn(r)
+		if r.ExecCode != 0 {
+			if r.failFn != nil {
+				errors.catchErr = r.failFn(r)
 			}
-		} else if r.RspInfo.ErrorID != 0 {
-			errors.catchErr = r.failFn(r)
+		} else {
+			if r.RspInfo == nil || r.RspInfo.ErrorID == 0 {
+				if r.successFn != nil {
+					errors.thenErr = r.successFn(r)
+				}
+			} else if r.RspInfo.ErrorID != 0 {
+				if r.failFn != nil {
+					errors.catchErr = r.failFn(r)
+				}
+			}
 		}
 
 		if r.finalFn != nil {
@@ -151,6 +161,8 @@ type AsyncRHMonitorApi struct {
 	RHMonitorApi
 
 	asyncCache sync.Map
+	orderFlow  *Result[Order]
+	tradeFlow  *Result[Trade]
 }
 
 func NewAsyncRHMonitorApi(brokerID, addr string, port int) *AsyncRHMonitorApi {
@@ -313,4 +325,50 @@ func (api *AsyncRHMonitorApi) OnRspOffsetOrder(offset *OffsetOrder, info *RspInf
 			api.asyncCache.Delete(reqID)
 		}
 	}
+}
+
+func (api *AsyncRHMonitorApi) AsyncReqSubInvestorOrder(investor *Investor) Promise[Order] {
+	_, rtn := api.ReqSubInvestorOrder(investor)
+
+	api.orderFlow = NewResult[Order](rtn, maxDataLen)
+
+	return api.orderFlow
+}
+
+func (api *AsyncRHMonitorApi) OnRtnOrder(order *Order) {
+	api.RHMonitorApi.OnRtnOrder(order)
+
+	if api.orderFlow != nil {
+		api.orderFlow.AppendResult(order, false)
+	}
+}
+
+func (api *AsyncRHMonitorApi) AsyncReqSubInvestorTrade(investor *Investor) Promise[Trade] {
+	_, rtn := api.ReqSubInvestorTrade(investor)
+
+	api.tradeFlow = NewResult[Trade](rtn, maxDataLen)
+
+	return api.tradeFlow
+}
+
+func (api *AsyncRHMonitorApi) OnRtnTrade(trade *Trade) {
+	api.RHMonitorApi.OnRtnTrade(trade)
+
+	if api.tradeFlow != nil {
+		api.tradeFlow.AppendResult(trade, false)
+	}
+}
+
+func (api *AsyncRHMonitorApi) OnRtnInvestorMoney(account *Account) {
+	api.RHMonitorApi.OnRtnInvestorMoney(account)
+
+	// api.accountChan.Publish("", *account)
+}
+
+func (api *AsyncRHMonitorApi) OnRtnInvestorPosition(position *Position) {
+	api.RHMonitorApi.OnRtnInvestorPosition(position)
+
+	// if api.positionFlow != nil {
+	// 	api.positionFlow.AppendResult(position, false)
+	// }
 }
