@@ -17,6 +17,10 @@ type RspInfo struct {
 	ErrorMsg string
 }
 
+func (rsp *RspInfo) Error() string {
+	return rsp.ErrorMsg
+}
+
 var rspInfoCache = sync.Pool{New: func() any { return &RspInfo{} }}
 
 func NewFromCRHRspInfoField(pRHRspInfoField *C.struct_CRHRspInfoField) *RspInfo {

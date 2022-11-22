@@ -44,6 +44,18 @@ func printData[T Investor | Account | Order | Trade | Position | OffsetOrder](in
 	}
 }
 
+type RHRiskApi interface {
+	ReqUserLogin(*RiskUser) (int64, int)
+	ReqUserLogout() (int64, int)
+	ReqQryMonitorAccounts() (int64, int)
+	ReqQryInvestorMoney(*Investor) (int64, int)
+	ReqQryInvestorPosition(*Investor, string) (int64, int)
+	ReqOffsetOrder(*OffsetOrder) (int64, int)
+	ReqSubPushInfo(*SubInfo) (int64, int)
+	ReqSubInvestorOrder(*Investor) (int64, int)
+	ReqSubInvestorTrade(*Investor) (int64, int)
+}
+
 type RHMonitorApi struct {
 	initOnce    sync.Once
 	releaseOnce sync.Once
@@ -61,71 +73,91 @@ type RHMonitorApi struct {
 	requestID int64
 }
 
-func (api *RHMonitorApi) nextRequestID() int {
-	return int(atomic.AddInt64(&api.requestID, 1))
+func (api *RHMonitorApi) nextRequestID(out *int64) int {
+	var old int64
+
+	for {
+		old = api.requestID
+		if atomic.CompareAndSwapInt64(&api.requestID, old, old+1) {
+			break
+		}
+	}
+
+	*out = old + 1
+	return int(old + 1)
 }
 
-func (api *RHMonitorApi) ReqUserLogin(login *RiskUser) int {
+func (api *RHMonitorApi) ReqUserLogin(login *RiskUser) (int64, int) {
+	var reqID int64
+
 	if login != nil {
 		api.riskUser = *login
 	} else {
 		log.Printf("No risk user info.")
-		return -255
+		return -1, -255
 	}
 
-	return api.requests.WaitConnectedAndDo(func() int {
+	return reqID, api.requests.WaitConnectedAndDo(func() int {
 		log.Printf("Request user login with cache: %+v", login)
 
 		return int(C.ReqUserLogin(
 			api.cInstance,
 			api.riskUser.ToCRHMonitorReqUserLoginField(),
-			C.int(api.nextRequestID()),
+			C.int(api.nextRequestID(&reqID)),
 		))
 	})
 }
 
-func (api *RHMonitorApi) ReqUserLogout() int {
+func (api *RHMonitorApi) ReqUserLogout() (int64, int) {
+	var reqID int64
+
 	log.Printf("Request user logout: %+v", api.riskUser)
 
-	return int(C.ReqUserLogout(
+	return reqID, int(C.ReqUserLogout(
 		api.cInstance,
 		api.riskUser.ToCRHMonitorUserLogoutField(),
-		C.int(api.nextRequestID()),
+		C.int(api.nextRequestID(&reqID)),
 	))
 }
 
-func (api *RHMonitorApi) ReqQryMonitorAccounts() int {
-	return api.requests.WaitLoginAndDo(func() int {
+func (api *RHMonitorApi) ReqQryMonitorAccounts() (int64, int) {
+	var reqID int64
+
+	return reqID, api.requests.WaitLoginAndDo(func() int {
 		log.Println("Request query monitor accounts with cache.")
 
 		return int(C.ReqQryMonitorAccounts(
 			api.cInstance,
 			api.riskUser.ToCRHMonitorQryMonitorUser(),
-			C.int(api.nextRequestID()),
+			C.int(api.nextRequestID(&reqID)),
 		))
 	})
 }
 
-func (api *RHMonitorApi) ExecReqQryInvestorMoney(investor *Investor) int {
+func (api *RHMonitorApi) ExecReqQryInvestorMoney(investor *Investor) (int64, int) {
+	var reqID int64
+
 	api.requests.WaitLogin()
 
 	log.Printf("Request query investor's money w/o cache: %+v", investor)
 
-	return int(C.ReqQryInvestorMoney(
+	return reqID, int(C.ReqQryInvestorMoney(
 		api.cInstance,
 		investor.ToCRHMonitorQryInvestorMoneyField(),
-		C.int(api.nextRequestID()),
+		C.int(api.nextRequestID(&reqID)),
 	))
 }
 
-func (api *RHMonitorApi) ReqQryInvestorMoney(investor *Investor) int {
-	return api.requests.WaitLoginAndDo(func() int {
+func (api *RHMonitorApi) ReqQryInvestorMoney(investor *Investor) (int64, int) {
+	var reqID int64
+
+	return reqID, api.requests.WaitLoginAndDo(func() int {
 		log.Printf("Request query investor's money with cache: %+v", investor)
 
 		return int(C.ReqQryInvestorMoney(
 			api.cInstance,
 			investor.ToCRHMonitorQryInvestorMoneyField(),
-			C.int(api.nextRequestID()),
+			C.int(api.nextRequestID(&reqID)),
 		))
 	})
 }
@@ -135,7 +167,7 @@ func (api *RHMonitorApi) ReqQryAllInvestorMoney() int {
 		log.Printf("Request query all investor's money with cache.")
 
 		api.investors.ForEach(func(_ string, investor *Investor) bool {
-			rtn = api.ExecReqQryInvestorMoney(investor)
+			_, rtn = api.ExecReqQryInvestorMoney(investor)
 
 			if rtn != 0 {
 				log.Printf("Query money for user[%s] failed: %d", investor.InvestorID, rtn)
@@ -148,26 +180,30 @@ func (api *RHMonitorApi) ReqQryAllInvestorMoney() int {
 	})
 }
 
-func (api *RHMonitorApi) ExecReqQryInvestorPosition(investor *Investor, instrumentID string) int {
+func (api *RHMonitorApi) ExecReqQryInvestorPosition(investor *Investor, instrumentID string) (int64, int) {
+	var reqID int64
+
 	api.requests.WaitLogin()
 
 	log.Printf("Query investor's position w/o cache: %+v @ %s", investor, instrumentID)
 
-	return int(C.ReqQryInvestorPosition(
+	return reqID, int(C.ReqQryInvestorPosition(
 		api.cInstance,
 		investor.ToCRHMonitorQryInvestorPositionField(instrumentID),
-		C.int(api.nextRequestID()),
+		C.int(api.nextRequestID(&reqID)),
 	))
 }
 
-func (api *RHMonitorApi) ReqQryInvestorPosition(investor *Investor, instrumentID string) int {
-	return api.requests.WaitLoginAndDo(func() int {
+func (api *RHMonitorApi) ReqQryInvestorPosition(investor *Investor, instrumentID string) (int64, int) {
+	var reqID int64
+
+	return reqID, api.requests.WaitLoginAndDo(func() int {
 		log.Printf("Query investor's position with cache: %+v @ %s", investor, instrumentID)
 
 		return int(C.ReqQryInvestorPosition(
 			api.cInstance,
 			investor.ToCRHMonitorQryInvestorPositionField(instrumentID),
-			C.int(api.nextRequestID()),
+			C.int(api.nextRequestID(&reqID)),
 		))
 	})
 }
@@ -177,7 +213,7 @@ func (api *RHMonitorApi) ReqQryAllInvestorPosition() int {
 		log.Printf("Request query all investor's position with cache.")
 
 		api.investors.ForEach(func(_ string, investor *Investor) bool {
-			rtn = api.ExecReqQryInvestorPosition(investor, "")
+			_, rtn = api.ExecReqQryInvestorPosition(investor, "")
 
 			if rtn != 0 {
 				log.Printf("Qeury postion for user[%s] failed: %d", investor.InvestorID, rtn)
@@ -191,36 +227,40 @@ func (api *RHMonitorApi) ReqQryAllInvestorPosition() int {
 	})
 }
 
-func (api *RHMonitorApi) ReqOffsetOrder(offsetOrder *OffsetOrder) int {
+func (api *RHMonitorApi) ReqOffsetOrder(offsetOrder *OffsetOrder) (int64, int) {
 	log.Printf("ReqOffsetOrder not implied: %+v", offsetOrder)
-	return -255
+	return -1, -255
 }
 
-func (api *RHMonitorApi) ExecReqSubPushInfo(sub *SubInfo) int {
+func (api *RHMonitorApi) ExecReqSubPushInfo(sub *SubInfo) (int64, int) {
+	var reqID int64
+
 	api.requests.WaitLogin()
 
 	log.Printf("Request sub info w/o cache: %+v", sub)
 
-	return int(C.ReqSubPushInfo(
+	return reqID, int(C.ReqSubPushInfo(
 		api.cInstance,
 		sub.ToCRHMonitorSubPushInfo(),
-		C.int(api.nextRequestID()),
+		C.int(api.nextRequestID(&reqID)),
 	))
 }
 
-func (api *RHMonitorApi) ReqSubPushInfo(sub *SubInfo) int {
-	return api.requests.WaitLoginAndDo(func() int {
+func (api *RHMonitorApi) ReqSubPushInfo(sub *SubInfo) (int64, int) {
+	var reqID int64
+
+	return reqID, api.requests.WaitLoginAndDo(func() int {
 		log.Printf("Request sub info with cache: %+v", sub)
 
 		return int(C.ReqSubPushInfo(
 			api.cInstance,
 			sub.ToCRHMonitorSubPushInfo(),
-			C.int(api.nextRequestID()),
+			C.int(api.nextRequestID(&reqID)),
 		))
 	})
 }
 
-func (api *RHMonitorApi) ExecReqSubInvestorOrder(investor *Investor) int {
+func (api *RHMonitorApi) ExecReqSubInvestorOrder(investor *Investor) (int64, int) {
 	sub := SubInfo{}
 	sub.BrokerID = investor.BrokerID
 	sub.InvestorID = investor.InvestorID
@@ -230,7 +270,7 @@ func (api *RHMonitorApi) ExecReqSubInvestorOrder(investor *Investor) int {
 	return api.ExecReqSubPushInfo(&sub)
 }
 
-func (api *RHMonitorApi) ReqSubInvestorOrder(investor *Investor) int {
+func (api *RHMonitorApi) ReqSubInvestorOrder(investor *Investor) (int64, int) {
 	sub := SubInfo{}
 	sub.BrokerID = investor.BrokerID
 	sub.InvestorID = investor.InvestorID
@@ -245,7 +285,7 @@ func (api *RHMonitorApi) ReqSubAllInvestorOrder() int {
 		log.Printf("Request sub all investor[%d]'s order with cache.", api.investors.Size())
 
 		api.investors.ForEach(func(_ string, investor *Investor) bool {
-			rtn = api.ExecReqSubInvestorOrder(investor)
+			_, rtn = api.ExecReqSubInvestorOrder(investor)
 
 			if rtn != 0 {
 				log.Printf("Sub investor[%s]'s order failed: %d", investor.InvestorID, rtn)
@@ -260,7 +300,7 @@ func (api *RHMonitorApi) ReqSubAllInvestorOrder() int {
 
 }
 
-func (api *RHMonitorApi) ExecReqSubInvestorTrade(investor *Investor) int {
+func (api *RHMonitorApi) ExecReqSubInvestorTrade(investor *Investor) (int64, int) {
 	sub := SubInfo{}
 	sub.BrokerID = investor.BrokerID
 	sub.InvestorID = investor.InvestorID
@@ -270,7 +310,7 @@ func (api *RHMonitorApi) ExecReqSubInvestorTrade(investor *Investor) int {
 	return api.ExecReqSubPushInfo(&sub)
 }
 
-func (api *RHMonitorApi) ReqSubInvestorTrade(investor *Investor) int {
+func (api *RHMonitorApi) ReqSubInvestorTrade(investor *Investor) (int64, int) {
 	sub := SubInfo{}
 	sub.BrokerID = investor.BrokerID
 	sub.InvestorID = investor.InvestorID
@@ -285,7 +325,7 @@ func (api *RHMonitorApi) ReqSubAllInvestorTrade() int {
 		log.Printf("Request sub all investor[%d]'s trade info with cache.", api.investors.Size())
 
 		api.investors.ForEach(func(_ string, investor *Investor) bool {
-			rtn = api.ExecReqSubInvestorTrade(investor)
+			_, rtn = api.ExecReqSubInvestorTrade(investor)
 
 			if rtn != 0 {
 				log.Printf("Sub investor[%s]'s trade failed: %d", investor.InvestorID, rtn)
