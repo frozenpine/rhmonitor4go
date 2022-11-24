@@ -1,8 +1,11 @@
 package rhmonitor4go
 
 import (
+	"bytes"
 	"log"
 	"sync"
+	"sync/atomic"
+	"unsafe"
 )
 
 const (
@@ -23,10 +26,45 @@ type CallbackFn[T RHRiskData] func(*Result[T]) error
 // in order to active an result watcher goroutine
 // to execute callback functions
 type Promise[T RHRiskData] interface {
-	Await()
+	Await() error
 	Then(CallbackFn[T]) Promise[T]
 	Catch(CallbackFn[T]) Promise[T]
 	Finally(CallbackFn[T]) Promise[T]
+}
+
+type PromiseError struct {
+	ExecErr  error
+	RspErr   error
+	ThenErr  error
+	CatchErr error
+	FinalErr error
+}
+
+func (err *PromiseError) Error() string {
+	buff := bytes.NewBuffer(nil)
+
+	if err.ExecErr != nil {
+		buff.WriteString("request execution failed: " + err.ExecErr.Error())
+		return buff.String()
+	}
+
+	if err.RspErr == nil {
+		if err.ThenErr != nil {
+			buff.WriteString("Then() callback failed: " + err.ThenErr.Error() + "\n")
+		}
+	} else {
+		buff.WriteString("response error: " + err.RspErr.Error() + "\n")
+
+		if err.CatchErr != nil {
+			buff.WriteString("Catch() callback failed: " + err.CatchErr.Error() + "\n")
+		}
+	}
+
+	if err.FinalErr != nil {
+		buff.WriteString("Finally() callback failed: " + err.FinalErr.Error())
+	}
+
+	return buff.String()
 }
 
 type Result[T RHRiskData] struct {
@@ -87,56 +125,46 @@ func (r *Result[T]) AppendResult(v *T, isLast bool) {
 	}
 }
 
-func (r *Result[T]) Await() {
+func (r *Result[T]) Await() error {
 	r.finish.Add(1)
 
 	r.startOnce.Do(func() { close(r.start) })
+
+	var err PromiseError
 
 	go func() {
 		r.waitAsyncData()
 
 		defer r.finish.Done()
 
-		var errors struct {
-			thenErr  error
-			catchErr error
-			finalErr error
-		}
-
 		if r.ExecCode != 0 {
 			if r.failFn != nil {
-				errors.catchErr = r.failFn(r)
+				err.ExecErr = r.failFn(r)
 			}
-		} else {
-			if r.RspInfo == nil || r.RspInfo.ErrorID == 0 {
-				if r.successFn != nil {
-					errors.thenErr = r.successFn(r)
-				}
-			} else if r.RspInfo.ErrorID != 0 {
-				if r.failFn != nil {
-					errors.catchErr = r.failFn(r)
-				}
+
+			return
+		}
+
+		if r.RspInfo == nil || r.RspInfo.ErrorID == 0 {
+			if r.successFn != nil {
+				err.ThenErr = r.successFn(r)
+			}
+		} else if r.RspInfo.ErrorID != 0 {
+			err.RspErr = r.RspInfo
+
+			if r.failFn != nil {
+				err.CatchErr = r.failFn(r)
 			}
 		}
 
 		if r.finalFn != nil {
-			errors.finalErr = r.finalFn(r)
-		}
-
-		if errors.thenErr != nil {
-			log.Printf("Async[Then] callback for request[%d] error: %+v", r.RequestID, errors.thenErr)
-		}
-
-		if errors.catchErr != nil {
-			log.Printf("Async[Catch] callback for request[%d] error: %+v", r.RequestID, errors.thenErr)
-		}
-
-		if errors.finalErr != nil {
-			log.Printf("Async[Finally] callback for request[%d] error: %+v", r.RequestID, errors.finalErr)
+			err.FinalErr = r.finalFn(r)
 		}
 	}()
 
 	r.finish.Wait()
+
+	return &err
 }
 
 func (r *Result[T]) Then(fn CallbackFn[T]) Promise[T] {
@@ -330,7 +358,10 @@ func (api *AsyncRHMonitorApi) OnRspOffsetOrder(offset *OffsetOrder, info *RspInf
 func (api *AsyncRHMonitorApi) AsyncReqSubInvestorOrder(investor *Investor) Promise[Order] {
 	_, rtn := api.ReqSubInvestorOrder(investor)
 
-	api.orderFlow = NewResult[Order](rtn, maxDataLen)
+	atomic.CompareAndSwapPointer(
+		(*unsafe.Pointer)(unsafe.Pointer(&api.orderFlow)),
+		nil, unsafe.Pointer(NewResult[Order](rtn, maxDataLen)),
+	)
 
 	return api.orderFlow
 }
@@ -346,7 +377,10 @@ func (api *AsyncRHMonitorApi) OnRtnOrder(order *Order) {
 func (api *AsyncRHMonitorApi) AsyncReqSubInvestorTrade(investor *Investor) Promise[Trade] {
 	_, rtn := api.ReqSubInvestorTrade(investor)
 
-	api.tradeFlow = NewResult[Trade](rtn, maxDataLen)
+	atomic.CompareAndSwapPointer(
+		(*unsafe.Pointer)(unsafe.Pointer(&api.tradeFlow)),
+		nil, unsafe.Pointer(NewResult[Trade](rtn, maxDataLen)),
+	)
 
 	return api.tradeFlow
 }

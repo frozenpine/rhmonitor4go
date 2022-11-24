@@ -1,5 +1,5 @@
-github.com/frozenpine/channel v0.0.1 h1:3hSuMt08LcLFlWF8NDoYPi3jlM19pc8NMa91mFaWK2g=
-github.com/frozenpine/channel v0.0.1/go.mod h1:ruTCbu/FnVgL7CsZWKP5EibzgkslqghvkhwSPLJEq7I=
+github.com/frozenpine/msgqueue v0.0.1 h1:uaGvrc1xn3+bKbTEiHJktJ4uiMP3Cnta9Gbgyuxe0GQ=
+github.com/frozenpine/msgqueue v0.0.1/go.mod h1:zz+KCmAexhgQcKue19T2m8Ko4pUhF3w7BhDhHLaLom4=
 github.com/gofrs/uuid v4.3.1+incompatible h1:0/KbAdpx3UXAx1kEOWHJeOkpbgRFGHVgv+CFIY7dBJI=
 github.com/gofrs/uuid v4.3.1+incompatible/go.mod h1:b2aQJv3Z4Fp6yNu3cdSllBxTCLRxnplIgP/c0N/04lM=
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=

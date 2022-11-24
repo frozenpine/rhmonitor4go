@@ -3,7 +3,7 @@ package rhmonitor4go
 import (
 	"sync/atomic"
 
-	"github.com/frozenpine/channel"
+	"github.com/frozenpine/msgqueue/channel"
 )
 
 func waitBoolFlag(flag *atomic.Bool, v bool) <-chan struct{} {
@@ -167,7 +167,7 @@ func (cache *InvestorCache) ForEach(fn func(string, *Investor) bool) {
 
 type AccountCache struct {
 	data     map[string]*Account
-	dataChan *channel.Hub[*Account]
+	dataChan channel.Channel[Account]
 }
 
 func (cache *AccountCache) Size() int {
@@ -196,7 +196,7 @@ func (cache *AccountCache) ForEach(fn func(string, *Account) bool) {
 
 type DataCache[T Position | Order | OffsetOrder | Account] struct {
 	data     map[string]*T
-	dataChan *channel.Hub[*T]
+	dataChan channel.Channel[T]
 }
 
 func (cache *DataCache[T]) Size() int {

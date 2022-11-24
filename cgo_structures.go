@@ -7,6 +7,7 @@ package rhmonitor4go
 */
 import "C"
 import (
+	"bytes"
 	"strconv"
 	"sync"
 	"unsafe"
@@ -18,7 +19,12 @@ type RspInfo struct {
 }
 
 func (rsp *RspInfo) Error() string {
-	return rsp.ErrorMsg
+	buff := bytes.NewBuffer(nil)
+
+	buff.WriteString("[" + strconv.Itoa(rsp.ErrorID) + "] ")
+	buff.WriteString(rsp.ErrorMsg)
+
+	return buff.String()
 }
 
 var rspInfoCache = sync.Pool{New: func() any { return &RspInfo{} }}
