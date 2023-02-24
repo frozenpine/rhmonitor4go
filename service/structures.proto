@@ -1,0 +1,256 @@
+syntax = "proto3";
+
+package service;
+
+message RspInfo {
+  int32 error_id = 1;
+  string error_msg = 2;
+}
+
+message Investor {
+  string broker_id = 1;
+  string investor_id = 2;
+}
+
+message TradingDay { string trading_day = 1; }
+
+enum CurrencyID {
+  CNY = 0;
+  USD = 1;
+}
+
+message FundMortgage {
+  double pre_in = 1;
+  double pre_out = 2;
+  double pre_mortgage = 3;
+  double current_in = 4;
+  double current_out = 5;
+  double mortgage = 6;
+  double available = 7;
+  double mortgagable = 8;
+}
+
+message SpecProduct {
+  double margin = 1;
+  double frozen_margin = 2;
+  double commission = 3;
+  double frozen_commission = 4;
+  double position_profit = 5;
+  double close_profit = 6;
+  double position_profit_by_alg = 7;
+  double exchange_margin = 8;
+}
+
+enum BusinessType {
+  future = 0;
+  stock = 1;
+}
+
+message Account {
+  Investor investor = 1;
+  double pre_credit = 2;
+  double pre_deposit = 3;
+  double pre_balance = 4;
+  double pre_margin = 5;
+  double interest_base = 6;
+  double interest = 7;
+  double deposit = 8;
+  double withdraw = 9;
+  double frozen_margin = 10;
+  double frozen_cash = 11;
+  double frozen_commission = 12;
+  double current_margin = 13;
+  double cash_in = 14;
+  double commission = 15;
+  double close_profit = 16;
+  double position_profit = 17;
+  double balance = 18;
+  double available = 19;
+  double withdraw_quota = 20;
+  double reserve = 21;
+  TradingDay trading_day = 22;
+  int32 settlement_id = 23;
+  double credit = 24;
+  double exchange_margin = 25;
+  double delivery_margin = 26;
+  double exchange_delivery_margin = 27;
+  double reserve_balance = 28;
+  CurrencyID currency_id = 29;
+  FundMortgage mortgage_info = 30;
+  SpecProduct spec_product_info = 31;
+  BusinessType business_type = 32;
+  double frozen_swap = 33;
+  double remain_swap = 34;
+  double stock_market_value = 35;
+  double option_market_value = 36;
+  double dynamic_money = 37;
+  double premium = 38;
+  double market_value_equity = 39;
+}
+
+enum HedgeFlag {
+  speculation = 0;
+  arbitrage = 1;
+  hedge = 2;
+  market_maker = 3;
+}
+
+enum Direction {
+  option allow_alias = true;
+  buy = 0;
+  long = 0;
+  sell = 1;
+  short = 1;
+}
+
+enum OrderPriceType {
+  any_price = 0;
+  limit_price = 1;
+  best_price = 2;
+  last_price = 3;
+  last_price_plus1 = 4;
+  last_price_plus2 = 5;
+  last_price_plus3 = 6;
+  ask_price = 7;
+  ask_price_plus1 = 8;
+  ask_price_plus2 = 9;
+  ask_price_plus3 = 10;
+  bid_price = 11;
+  bid_price_plus1 = 12;
+  bid_price_plus2 = 13;
+  bid_price_plus3 = 14;
+  five_level_price = 15;
+  stop_loss_market = 16;
+  stop_loss_limit = 17;
+  gtc_limit = 18;
+  stock_lend = 19;
+  stock_financing_buy = 20;
+  repay_stock = 21;
+  etf_purchase = 22;
+  etf_redemption = 23;
+}
+
+message Position {
+  Investor investor = 1;
+  string product_id = 2;
+  string instrument_id = 3;
+  HedgeFlag hedge_flag = 4;
+  Direction direction = 5;
+  int32 volume = 6;
+  double margin = 7;
+  double avg_open_price_by_vol = 8;
+  double avg_open_price = 9;
+  int32 today_volume = 10;
+  int32 frozen_volume = 11;
+  uint32 entry_type = 12;
+}
+
+enum TradingRole {
+  broker = 0;
+  host = 1;
+  maker = 2;
+}
+
+enum OffsetFlag {
+  open = 0;
+  close = 1;
+  force_close = 2;
+  close_today = 3;
+  close_yesterday = 4;
+  force_off = 5;
+  local_force_off = 6;
+}
+
+enum TradeType {
+  split_combination = 0;
+  common = 1;
+  options_execution = 2;
+  otc = 3;
+  efp_derived = 4;
+  combination_derived = 5;
+  finacing_buy = 6;
+  repay_stock_auto = 7;
+  repay_stock_manual = 8;
+}
+
+enum PriceSource {
+  ps_last_price = 0;
+  ps_buy = 1;
+  ps_sell = 2;
+}
+
+enum TradeSource {
+  ts_normal = 0;
+  ts_query = 1;
+}
+
+message Trade {
+  Investor investor = 1;
+  string instrument_id = 2;
+  string order_ref = 3;
+  string user_id = 4;
+  string exchange_id = 5;
+  string trade_id = 6;
+  Direction direction = 7;
+  string order_sys_id = 8;
+  string participant_id = 9;
+  string client_id = 10;
+  TradingRole trading_role = 11;
+  string exchange_instrument_id = 12;
+  OffsetFlag offset_flag = 13;
+  HedgeFlag hedge_flag = 14;
+  double price = 15;
+  int32 volume = 16;
+  string trade_date = 17;
+  string trade_time = 18;
+  TradeType trade_type = 19;
+  PriceSource price_source = 20;
+  string trader_id = 21;
+  string order_local_id = 22;
+  string clearing_part_id = 23;
+  string business_unit = 24;
+  int32 sequence_no = 25;
+  string trading_day = 26;
+  int32 settlement_id = 27;
+  int32 broker_order_seqence = 28;
+  TradeSource trade_source = 29;
+  string investor_unit_id = 30;
+}
+
+enum AccountType {
+  virtual = 0;
+  real = 1;
+  real_group = 2;
+}
+
+enum SubInfoType {
+  order = 0;
+  trade = 1;
+}
+
+message SubInfo {
+  Investor investor = 1;
+  AccountType account_type = 2;
+  SubInfoType sub_info_type = 3;
+}
+
+message RiskUser {
+  string user_id = 1;
+  string password = 2;
+  string mac_addr = 3;
+}
+
+enum PrivilegeType {
+  admin = 0;
+  normal = 1;
+}
+
+message RspUserLogin {
+  string user_id = 1;
+  string trading_day = 2;
+  string login_time = 3;
+  PrivilegeType privilege_type = 4;
+  string privilege_info = 5;
+}
+
+message RspUserLogout { string user_id = 1; }

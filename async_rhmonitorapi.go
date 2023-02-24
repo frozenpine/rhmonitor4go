@@ -2,9 +2,11 @@ package rhmonitor4go
 
 import (
 	"bytes"
+	"context"
 	"log"
 	"sync"
 	"sync/atomic"
+	"time"
 	"unsafe"
 )
 
@@ -26,7 +28,7 @@ type CallbackFn[T RHRiskData] func(*Result[T]) error
 // in order to active an result watcher goroutine
 // to execute callback functions
 type Promise[T RHRiskData] interface {
-	Await() error
+	Await(context.Context, time.Duration) error
 	Then(CallbackFn[T]) Promise[T]
 	Catch(CallbackFn[T]) Promise[T]
 	Finally(CallbackFn[T]) Promise[T]
@@ -125,7 +127,7 @@ func (r *Result[T]) AppendResult(v *T, isLast bool) {
 	}
 }
 
-func (r *Result[T]) Await() error {
+func (r *Result[T]) Await(ctx context.Context, timeout time.Duration) error {
 	r.finish.Add(1)
 
 	r.startOnce.Do(func() { close(r.start) })
@@ -204,7 +206,7 @@ func NewAsyncRHMonitorApi(brokerID, addr string, port int) *AsyncRHMonitorApi {
 	return &api
 }
 
-func (api *AsyncRHMonitorApi) AsyncReqUserLogin(login *RiskUser) Promise[RspUserLogin] {
+func (api *AsyncRHMonitorApi) AsyncReqUserLogin(login *RiskUser) *Result[RspUserLogin] {
 	reqID, rtn := api.ReqUserLogin(login)
 
 	result := NewResult[RspUserLogin](rtn, 1)
@@ -226,7 +228,7 @@ func (api *AsyncRHMonitorApi) OnRspUserLogin(login *RspUserLogin, info *RspInfo,
 	}
 }
 
-func (api *AsyncRHMonitorApi) AsyncReqUserLogout() Promise[RspUserLogout] {
+func (api *AsyncRHMonitorApi) AsyncReqUserLogout() *Result[RspUserLogout] {
 	reqID, rtn := api.ReqUserLogout()
 	result := NewResult[RspUserLogout](rtn, 1)
 
@@ -247,7 +249,7 @@ func (api *AsyncRHMonitorApi) OnRspUserLogout(logout *RspUserLogout, info *RspIn
 	}
 }
 
-func (api *AsyncRHMonitorApi) AsyncReqQryMonitorAccounts() Promise[Investor] {
+func (api *AsyncRHMonitorApi) AsyncReqQryMonitorAccounts() *Result[Investor] {
 	reqID, rtn := api.ReqQryMonitorAccounts()
 	result := NewResult[Investor](rtn, maxDataLen)
 
@@ -274,7 +276,7 @@ func (api *AsyncRHMonitorApi) OnRspQryMonitorAccounts(investor *Investor, info *
 	}
 }
 
-func (api *AsyncRHMonitorApi) AsyncReqQryInvestorMoney(investor *Investor) Promise[Account] {
+func (api *AsyncRHMonitorApi) AsyncReqQryInvestorMoney(investor *Investor) *Result[Account] {
 	reqID, rtn := api.ReqQryInvestorMoney(investor)
 	result := NewResult[Account](rtn, maxDataLen)
 
@@ -301,7 +303,7 @@ func (api *AsyncRHMonitorApi) OnRspQryInvestorMoney(acct *Account, info *RspInfo
 	}
 }
 
-func (api *AsyncRHMonitorApi) AsyncReqQryInvestorPosition(investor *Investor, instrument string) Promise[Position] {
+func (api *AsyncRHMonitorApi) AsyncReqQryInvestorPosition(investor *Investor, instrument string) *Result[Position] {
 	reqID, rtn := api.ReqQryInvestorPosition(investor, instrument)
 	result := NewResult[Position](rtn, maxDataLen)
 
@@ -328,7 +330,7 @@ func (api *AsyncRHMonitorApi) OnRspQryInvestorPosition(pos *Position, info *RspI
 	}
 }
 
-func (api *AsyncRHMonitorApi) AsyncReqOffsetOrder(offset *OffsetOrder) Promise[OffsetOrder] {
+func (api *AsyncRHMonitorApi) AsyncReqOffsetOrder(offset *OffsetOrder) *Result[OffsetOrder] {
 	reqID, rtn := api.ReqOffsetOrder(offset)
 	result := NewResult[OffsetOrder](rtn, maxDataLen)
 
@@ -355,7 +357,7 @@ func (api *AsyncRHMonitorApi) OnRspOffsetOrder(offset *OffsetOrder, info *RspInf
 	}
 }
 
-func (api *AsyncRHMonitorApi) AsyncReqSubInvestorOrder(investor *Investor) Promise[Order] {
+func (api *AsyncRHMonitorApi) AsyncReqSubInvestorOrder(investor *Investor) *Result[Order] {
 	_, rtn := api.ReqSubInvestorOrder(investor)
 
 	atomic.CompareAndSwapPointer(
@@ -374,7 +376,7 @@ func (api *AsyncRHMonitorApi) OnRtnOrder(order *Order) {
 	}
 }
 
-func (api *AsyncRHMonitorApi) AsyncReqSubInvestorTrade(investor *Investor) Promise[Trade] {
+func (api *AsyncRHMonitorApi) AsyncReqSubInvestorTrade(investor *Investor) *Result[Trade] {
 	_, rtn := api.ReqSubInvestorTrade(investor)
 
 	atomic.CompareAndSwapPointer(

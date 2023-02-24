@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+package service;
+
+import "structures.proto";
+
+message RiskServer {
+  string broker_id = 1;
+  string server_addr = 2;
+  int32 server_port = 3;
+}
+
+message InvestorList { repeated Investor data = 1; }
+message AccountList { repeated Account data = 1; }
+message PositionList { repeated Position data = 1; }
+
+message Result {
+  int32 req_id = 1;
+  RspInfo rsp_info = 2;
+  oneof response {
+    string api_identity = 10;
+    RspUserLogin user_login = 11;
+    RspUserLogout user_logout = 12;
+    InvestorList investors = 13;
+    AccountList accounts = 14;
+    PositionList positions = 15;
+  };
+}
+
+message Request {
+  string api_identity = 1;
+  oneof request {
+    RiskServer front = 11;
+    RiskUser login = 12;
+    Investor investor = 13;
+  }
+}
+
+service RohonMonitor {
+  rpc Init(Request) returns (Result) {}
+  rpc ReqUserLogin(Request) returns (Result) {}
+  rpc ReqUserLogout(Request) returns (Result) {}
+  rpc ReqQryMonitorAccounts(Request) returns (Result) {}
+  rpc ReqQryInvestorMoney(Request) returns (Result) {}
+  rpc ReqQryInvestorPosition(Request) returns (Result) {}
+  rpc SubInvestorMoney(Request) returns (stream Account) {}
+  rpc SubInvestorPosition(Request) returns (stream Position) {}
+}
