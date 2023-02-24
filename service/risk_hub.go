@@ -26,7 +26,7 @@ type riskApi struct {
 }
 
 func reqFinalFn[T rohon.RHRiskData](result *Result) rohon.CallbackFn[T] {
-	return func(req *rohon.Result[T]) error {
+	return func(req *rohon.SingleResult[T]) error {
 		result.ReqId = int32(req.RequestID)
 
 		if req.RspInfo != nil {
@@ -39,16 +39,16 @@ func reqFinalFn[T rohon.RHRiskData](result *Result) rohon.CallbackFn[T] {
 	}
 }
 
-func checkFuture[T rohon.RHRiskData](future *rohon.Result[T], caller string) (rohon.Promise[T], error) {
-	if future.ExecCode != 0 {
+func checkPromise[T rohon.RHRiskData](promise rohon.Result[T], caller string) (rohon.Promise[T], error) {
+	if code := promise.GetExecCode(); code != 0 {
 		return nil, errors.Wrapf(
 			ErrRequestFailed,
-			"[%s] execution failed",
-			caller,
+			"[%s] execution failed[%d]",
+			caller, code,
 		)
 	}
 
-	return future, nil
+	return promise, nil
 }
 
 type riskHub struct {
@@ -113,8 +113,8 @@ func (hub *riskHub) ReqUserLogin(ctx context.Context, req *Request) (result *Res
 		return
 	}
 
-	var future rohon.Promise[rohon.RspUserLogin]
-	if future, err = checkFuture(
+	var promise rohon.Promise[rohon.RspUserLogin]
+	if promise, err = checkPromise(
 		api.ins.AsyncReqUserLogin(&rohon.RiskUser{
 			UserID:   req.GetLogin().UserId,
 			Password: req.GetLogin().Password,
@@ -124,7 +124,7 @@ func (hub *riskHub) ReqUserLogin(ctx context.Context, req *Request) (result *Res
 		return
 	}
 
-	if err = future.Then(func(r *rohon.Result[rohon.RspUserLogin]) error {
+	if err = promise.Then(func(r *rohon.SingleResult[rohon.RspUserLogin]) error {
 		login := <-r.Data
 
 		var pri_type PrivilegeType
@@ -149,7 +149,7 @@ func (hub *riskHub) ReqUserLogin(ctx context.Context, req *Request) (result *Res
 	}).Finally(
 		reqFinalFn[rohon.RspUserLogin](result),
 	).Await(ctx, hub.apiReqTimeout); err != nil {
-		err = errors.Wrap(err, "wait rsp result failed")
+		err = errors.Wrap(err, "[ReqUserLogin] wait rsp result failed")
 	}
 
 	return
@@ -161,15 +161,15 @@ func (hub *riskHub) ReqUserLogout(ctx context.Context, req *Request) (result *Re
 		return
 	}
 
-	var future rohon.Promise[rohon.RspUserLogout]
-	if future, err = checkFuture(
+	var promise rohon.Promise[rohon.RspUserLogout]
+	if promise, err = checkPromise(
 		api.ins.AsyncReqUserLogout(),
 		"ReqUserLogout",
 	); err != nil {
 		return
 	}
 
-	if err = future.Then(func(r *rohon.Result[rohon.RspUserLogout]) error {
+	if err = promise.Then(func(r *rohon.SingleResult[rohon.RspUserLogout]) error {
 		logout := <-r.Data
 
 		result.Response = &Result_UserLogout{
@@ -182,7 +182,7 @@ func (hub *riskHub) ReqUserLogout(ctx context.Context, req *Request) (result *Re
 	}).Finally(
 		reqFinalFn[rohon.RspUserLogout](result),
 	).Await(ctx, hub.apiReqTimeout); err != nil {
-		err = errors.Wrap(err, "wait rsp result failed")
+		err = errors.Wrap(err, "[ReqUserLogout] wait rsp result failed")
 	}
 
 	return
@@ -194,15 +194,15 @@ func (hub *riskHub) ReqQryMonitorAccounts(ctx context.Context, req *Request) (re
 		return
 	}
 
-	var future rohon.Promise[rohon.Investor]
-	if future, err = checkFuture(
+	var promise rohon.Promise[rohon.Investor]
+	if promise, err = checkPromise(
 		api.ins.AsyncReqQryMonitorAccounts(),
 		"ReqQryMonitorAccounts",
 	); err != nil {
 		return
 	}
 
-	if err = future.Then(func(r *rohon.Result[rohon.Investor]) error {
+	if err = promise.Then(func(r *rohon.SingleResult[rohon.Investor]) error {
 		investors := InvestorList{}
 
 		for inv := range r.Data {
@@ -220,7 +220,125 @@ func (hub *riskHub) ReqQryMonitorAccounts(ctx context.Context, req *Request) (re
 	}).Finally(
 		reqFinalFn[rohon.Investor](result),
 	).Await(ctx, hub.apiReqTimeout); err != nil {
-		err = errors.Wrap(err, "wait rsp result failed")
+		err = errors.Wrap(err, "[ReqQryMonitorAccounts] wait rsp result failed")
+	}
+
+	return
+}
+
+func (hub *riskHub) ReqQryInvestorMoney(ctx context.Context, req *Request) (result *Result, err error) {
+	var api *riskApi
+	if api, err = hub.getApiInstance(req.GetApiIdentity()); err != nil {
+		return
+	}
+
+	var investor *rohon.Investor
+	if inv := req.GetInvestor(); inv != nil {
+		investor = &rohon.Investor{
+			BrokerID:   inv.BrokerId,
+			InvestorID: inv.InvestorId,
+		}
+	}
+
+	var promise rohon.Promise[rohon.Account]
+	if promise, err = checkPromise(
+		api.ins.AsyncReqQryInvestorMoney(investor),
+		"ReqQryInvestorMoney",
+	); err != nil {
+		return
+	}
+
+	if err = promise.Then(func(r *rohon.SingleResult[rohon.Account]) error {
+		accounts := &AccountList{}
+
+		for acct := range r.Data {
+			var currencyID CurrencyID
+			switch acct.CurrencyID {
+			case "USD":
+				currencyID = USD
+			default:
+				currencyID = CNY
+			}
+
+			var bizType BusinessType
+			switch acct.BizType {
+			case rohon.RH_TRADE_BZTP_Future:
+				bizType = future
+			case rohon.RH_TRADE_BZTP_Stock:
+				bizType = stock
+			}
+
+			accounts.Data = append(accounts.Data, &Account{
+				Investor: &Investor{
+					BrokerId:   acct.BrokerID,
+					InvestorId: acct.AccountID,
+				},
+				PreCredit:              acct.PreCredit,
+				PreDeposit:             acct.PreDeposit,
+				PreBalance:             acct.PreBalance,
+				PreMargin:              acct.PreMargin,
+				InterestBase:           acct.InterestBase,
+				Interest:               acct.Interest,
+				Deposit:                acct.Deposit,
+				Withdraw:               acct.Withdraw,
+				FrozenMargin:           acct.FrozenMargin,
+				FrozenCash:             acct.FrozenCash,
+				FrozenCommission:       acct.FrozenCommission,
+				CurrentMargin:          acct.CurrMargin,
+				CashIn:                 acct.CashIn,
+				Commission:             acct.Commission,
+				CloseProfit:            acct.CloseProfit,
+				PositionProfit:         acct.PositionProfit,
+				Balance:                acct.Balance,
+				Available:              acct.Available,
+				WithdrawQuota:          acct.WithdrawQuota,
+				Reserve:                acct.Reserve,
+				TradingDay:             acct.TradingDay,
+				SettlementId:           int32(acct.SettlementID),
+				Credit:                 acct.Credit,
+				ExchangeMargin:         acct.ExchangeMargin,
+				DeliveryMargin:         acct.DeliveryMargin,
+				ExchangeDeliveryMargin: acct.ExchangeDeliveryMargin,
+				ReserveBalance:         acct.ReserveBalance,
+				CurrencyId:             currencyID,
+				MortgageInfo: &FundMortgage{
+					PreIn:       acct.PreFundMortgageIn,
+					PreOut:      acct.PreFundMortgageOut,
+					PreMortgage: acct.PreMortgage,
+					CurrentIn:   acct.FundMortgageIn,
+					CurrentOut:  acct.FundMortgageOut,
+					Mortgage:    acct.Mortgage,
+					Available:   acct.FundMortgageAvailable,
+					Mortgagable: acct.MortgageableFund,
+				},
+				SpecProductInfo: &SpecProduct{
+					Margin:              acct.SpecProductMargin,
+					FrozenMargin:        acct.SpecProductFrozenMargin,
+					Commission:          acct.SpecProductCommission,
+					FrozenCommission:    acct.SpecProductFrozenCommission,
+					PositionProfit:      acct.SpecProductPositionProfit,
+					CloseProfit:         acct.SpecProductCloseProfit,
+					PositionProfitByAlg: acct.SpecProductPositionProfitByAlg,
+					ExchangeMargin:      acct.SpecProductExchangeMargin,
+				},
+				BusinessType:      bizType,
+				FrozenSwap:        acct.FrozenSwap,
+				RemainSwap:        acct.RemainSwap,
+				StockMarketValue:  acct.TotalStockMarketValue,
+				OptionMarketValue: acct.TotalOptionMarketValue,
+				DynamicMoney:      acct.DynamicMoney,
+				Premium:           acct.Premium,
+				MarketValueEquity: acct.MarketValueEquity,
+			})
+		}
+
+		result.Response = &Result_Accounts{Accounts: accounts}
+
+		return nil
+	}).Finally(func(r *rohon.SingleResult[rohon.Account]) error {
+		return nil
+	}).Await(ctx, hub.apiReqTimeout); err != nil {
+		err = errors.Wrap(err, "[ReqQryInvestorMoney] wait rsp result failed")
 	}
 
 	return

@@ -12,8 +12,6 @@ message Investor {
   string investor_id = 2;
 }
 
-message TradingDay { string trading_day = 1; }
-
 enum CurrencyID {
   CNY = 0;
   USD = 1;
@@ -68,7 +66,7 @@ message Account {
   double available = 19;
   double withdraw_quota = 20;
   double reserve = 21;
-  TradingDay trading_day = 22;
+  string trading_day = 22;
   int32 settlement_id = 23;
   double credit = 24;
   double exchange_margin = 25;
