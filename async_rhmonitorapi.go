@@ -1,12 +1,13 @@
 package rhmonitor4go
 
 import (
-	"bytes"
 	"context"
-	"errors"
+	"fmt"
 	"log"
 	"sync"
 	"time"
+
+	"github.com/pkg/errors"
 )
 
 const (
@@ -18,7 +19,7 @@ type RHRiskData interface {
 	RspUserLogin | RspUserLogout | Investor | Account | Position | OffsetOrder | Order | Trade
 }
 
-type CallbackFn[T RHRiskData] func(*SingleResult[T]) error
+type CallbackFn[T RHRiskData] func(Result[T]) error
 
 // Promise is a future result callback interface
 // Then(), Catch(), Finally() can be called in any order sequence
@@ -33,49 +34,52 @@ type Promise[T RHRiskData] interface {
 	Finally(CallbackFn[T]) Promise[T]
 }
 
+type PromiseStage uint8
+
+const (
+	PromiseInfight PromiseStage = iota
+	PromiseAwait
+	PromiseThen
+	PromiseCatch
+	PromiseFinal
+)
+
+type ExecError struct {
+	exec_code int
+}
+
+func (err *ExecError) Error() string {
+	return fmt.Sprintf("reqeuest execution failed[%d]", err.exec_code)
+}
+
 type PromiseError struct {
-	ExecErr  error
-	RspErr   error
-	ThenErr  error
-	CatchErr error
-	FinalErr error
+	stage PromiseStage
+	err   error
 }
 
 func (err *PromiseError) Error() string {
-	buff := bytes.NewBuffer(nil)
-
-	if err.ExecErr != nil {
-		buff.WriteString("request execution failed: " + err.ExecErr.Error())
-		return buff.String()
-	}
-
-	if err.RspErr == nil {
-		if err.ThenErr != nil {
-			buff.WriteString("Then() callback failed: " + err.ThenErr.Error() + "\n")
-		}
-	} else {
-		buff.WriteString("response error: " + err.RspErr.Error() + "\n")
-
-		if err.CatchErr != nil {
-			buff.WriteString("Catch() callback failed: " + err.CatchErr.Error() + "\n")
-		}
-	}
-
-	if err.FinalErr != nil {
-		buff.WriteString("Finally() callback failed: " + err.FinalErr.Error())
-	}
-
-	return buff.String()
+	return errors.Wrapf(
+		err.err,
+		"error occoured in stage %d",
+		err.stage,
+	).Error()
 }
 
 type Result[T RHRiskData] interface {
 	Promise[T]
+
+	IsBatch() bool
+	GetRequestID() int
 	GetExecCode() int
-	AppendResult(*T, bool)
+	GetRspInfo() *RspInfo
+	GetError() error
+	GetData() <-chan *T
+
+	AppendResult(int, *T, bool)
 }
 
 type baseResult[T RHRiskData] struct {
-	Data chan *T
+	data chan *T
 
 	startFlag chan struct{}
 	startOnce sync.Once
@@ -90,10 +94,22 @@ type baseResult[T RHRiskData] struct {
 	finalFn   CallbackFn[T]
 }
 
+func (r *baseResult[T]) init() {
+	r.data = make(chan *T)
+	r.startFlag = make(chan struct{})
+	r.notifyFlag = make(chan struct{})
+}
+
+func (r *baseResult[T]) GetData() <-chan *T {
+	return r.data
+}
+
 func (r *baseResult[T]) waitAsyncData() {
 	<-r.startFlag
 	<-r.notifyFlag
 }
+
+func (r *baseResult[T]) IsBatch() bool { return false }
 
 func (r *baseResult[T]) Then(fn CallbackFn[T]) Promise[T] {
 	r.successFn = fn
@@ -120,45 +136,252 @@ func (r *baseResult[T]) Await(context.Context, time.Duration) error {
 type BatchResult[T RHRiskData] struct {
 	baseResult[T]
 
-	RequestIDList []int
-	ExecCodeList  []int
-	RspInfoList   []*RspInfo
+	requestIDList       []int
+	execCodeList        []int
+	promiseErrChainList [][]PromiseError
+	rspInfoCache        map[int]chan *RspInfo
+	rspStatusCache      map[int]bool
+}
+
+func (r *BatchResult[T]) IsBatch() bool { return true }
+
+func (r *BatchResult[T]) GetRequestID() int {
+	size := len(r.requestIDList)
+	if size == 0 {
+		return -1
+	}
+
+	return r.requestIDList[size-1]
+}
+
+func (r *BatchResult[T]) GetRspInfo() *RspInfo {
+	size := len(r.requestIDList)
+
+	if size == 0 {
+		return nil
+	}
+
+	// TODO: return RspInfo
+	return nil
 }
 
 func (r *BatchResult[T]) AppendRequest(reqID, execCode int) {
-	r.RequestIDList = append(r.RequestIDList, reqID)
-	r.ExecCodeList = append(r.ExecCodeList, execCode)
+	r.requestIDList = append(r.requestIDList, reqID)
+	r.execCodeList = append(r.execCodeList, execCode)
+	r.promiseErrChainList = append(r.promiseErrChainList, []PromiseError{})
+
+	if execCode == 0 {
+		r.rspInfoCache[reqID] = make(chan *RspInfo)
+		r.rspStatusCache[reqID] = false
+	}
 }
 
 func (r *BatchResult[T]) GetExecCode() int {
-	size := len(r.RequestIDList)
+	size := len(r.requestIDList)
 
 	if size <= 0 {
 		return 255
 	}
 
-	return r.ExecCodeList[size-1]
+	return r.execCodeList[size-1]
+}
+
+func (r *BatchResult[T]) GetError() (err error) {
+	for _, errChain := range r.promiseErrChainList {
+		for _, stageErr := range errChain {
+			if err == nil {
+				err = &stageErr
+			} else {
+				err = errors.Wrap(err, stageErr.Error())
+			}
+		}
+	}
+
+	return
+}
+
+func (r *BatchResult[T]) AppendResult(reqID int, v *T, isLast bool) {
+	if _, exist := r.rspInfoCache[reqID]; !exist {
+		log.Printf(
+			"Appended RequestID[%d] not exist in BatchResult", reqID,
+		)
+
+		return
+	}
+
+	r.notifyOnce.Do(func() { close(r.notifyFlag) })
+
+	r.data <- v
+
+	r.rspStatusCache[reqID] = isLast
+
+	all := true
+	for _, v := range r.rspStatusCache {
+		all = all && v
+	}
+
+	if all {
+		close(r.data)
+	}
+}
+
+func (r *BatchResult[T]) Await(ctx context.Context, timeout time.Duration) error {
+	r.startOnce.Do(func() { close(r.startFlag) })
+
+	r.finish.Add(len(r.rspInfoCache))
+
+	for idx, reqID := range r.requestIDList {
+		if r.execCodeList[idx] != 0 {
+			continue
+		}
+
+		go func(idx, reqID int) {
+			r.waitAsyncData()
+			defer r.finish.Done()
+
+			execCode := r.execCodeList[idx]
+			result := NewSingleResult[T](execCode, maxDataLen)
+
+			if execCode != 0 {
+				r.promiseErrChainList[idx] = append(
+					r.promiseErrChainList[idx],
+					PromiseError{
+						stage: PromiseInfight,
+						err:   &ExecError{exec_code: execCode},
+					},
+				)
+
+				goto CATCH
+			}
+
+			if ch, exist := r.rspInfoCache[reqID]; exist {
+				result.rspInfo = <-ch
+			}
+
+			if result.rspInfo == nil || result.rspInfo.ErrorID == 0 {
+				goto THEN
+			} else {
+				r.promiseErrChainList[idx] = append(
+					r.promiseErrChainList[idx],
+					PromiseError{
+						stage: PromiseAwait,
+						err:   result.rspInfo,
+					},
+				)
+
+				goto CATCH
+			}
+
+		THEN:
+			if r.successFn != nil {
+				if err := r.successFn(result); err != nil {
+					r.promiseErrChainList[idx] = append(
+						r.promiseErrChainList[idx],
+						PromiseError{
+							stage: PromiseThen,
+							err:   err,
+						},
+					)
+
+					goto CATCH
+				}
+			}
+
+			goto FINAL
+		CATCH:
+			if r.failFn != nil {
+				if err := r.failFn(result); err != nil {
+					r.promiseErrChainList[idx] = append(
+						r.promiseErrChainList[idx],
+						PromiseError{
+							stage: PromiseCatch,
+							err:   err,
+						},
+					)
+				}
+			}
+
+			goto FINAL
+		FINAL:
+			if r.finalFn != nil {
+				if err := r.finalFn(result); err != nil {
+					r.promiseErrChainList[idx] = append(
+						r.promiseErrChainList[idx],
+						PromiseError{
+							stage: PromiseFinal,
+							err:   err,
+						},
+					)
+				}
+			}
+		}(idx, reqID)
+	}
+
+	r.finish.Wait()
+
+	return r.GetError()
+}
+
+func NewBatchResult[T RHRiskData]() *BatchResult[T] {
+	result := BatchResult[T]{
+		rspInfoCache:   make(map[int]chan *RspInfo),
+		rspStatusCache: make(map[int]bool),
+	}
+	result.init()
+
+	return &result
 }
 
 type SingleResult[T RHRiskData] struct {
 	baseResult[T]
 
-	RequestID int
-	ExecCode  int
-	RspInfo   *RspInfo
+	promiseErrChain []PromiseError
+
+	requestID int
+	execCode  int
+	rspInfo   *RspInfo
+}
+
+func (r *SingleResult[T]) GetRequestID() int {
+	return r.requestID
+}
+
+func (r *SingleResult[T]) GetRspInfo() *RspInfo {
+	return r.rspInfo
 }
 
 func (r *SingleResult[T]) GetExecCode() int {
-	return r.ExecCode
+	return r.execCode
 }
 
-func (r *SingleResult[T]) AppendResult(v *T, isLast bool) {
+func (r *SingleResult[T]) GetError() (err error) {
+	for _, e := range r.promiseErrChain {
+		if err == nil {
+			err = &e
+		} else {
+			err = errors.Wrap(err, e.Error())
+		}
+	}
+
+	return err
+}
+
+func (r *SingleResult[T]) AppendResult(reqID int, v *T, isLast bool) {
+	if reqID != r.requestID {
+		log.Printf(
+			"Appended RequestID[%d] miss match with Result[%d]",
+			reqID, r.requestID,
+		)
+
+		return
+	}
+
 	r.notifyOnce.Do(func() { close(r.notifyFlag) })
 
-	r.Data <- v
+	r.data <- v
 
 	if isLast {
-		close(r.Data)
+		close(r.data)
 	}
 }
 
@@ -167,41 +390,85 @@ func (r *SingleResult[T]) Await(ctx context.Context, timeout time.Duration) erro
 
 	r.startOnce.Do(func() { close(r.startFlag) })
 
-	var err PromiseError
-
 	go func() {
 		r.waitAsyncData()
 
 		defer r.finish.Done()
 
-		if r.ExecCode != 0 {
-			if r.failFn != nil {
-				err.ExecErr = r.failFn(r)
-			}
+		if r.execCode != 0 {
+			r.promiseErrChain = append(
+				r.promiseErrChain,
+				PromiseError{
+					stage: PromiseInfight,
+					err:   &ExecError{exec_code: r.execCode},
+				},
+			)
 
-			return
+			goto CATCH
 		}
 
-		if r.RspInfo == nil || r.RspInfo.ErrorID == 0 {
-			if r.successFn != nil {
-				err.ThenErr = r.successFn(r)
-			}
-		} else if r.RspInfo.ErrorID != 0 {
-			err.RspErr = r.RspInfo
+		if r.rspInfo == nil || r.rspInfo.ErrorID == 0 {
+			goto THEN
+		} else {
+			r.promiseErrChain = append(
+				r.promiseErrChain,
+				PromiseError{
+					stage: PromiseAwait,
+					err:   r.rspInfo,
+				},
+			)
+			goto CATCH
+		}
 
-			if r.failFn != nil {
-				err.CatchErr = r.failFn(r)
+	THEN:
+		if r.successFn != nil {
+			if err := r.successFn(r); err != nil {
+				r.promiseErrChain = append(
+					r.promiseErrChain,
+					PromiseError{
+						stage: PromiseThen,
+						err:   err,
+					},
+				)
+
+				goto CATCH
 			}
 		}
 
+		goto FINAL
+
+	CATCH:
+		if r.failFn != nil {
+			if err := r.failFn(r); err != nil {
+				r.promiseErrChain = append(
+					r.promiseErrChain,
+					PromiseError{
+						stage: PromiseCatch,
+						err:   err,
+					},
+				)
+			}
+		}
+
+		goto FINAL
+
+	FINAL:
 		if r.finalFn != nil {
-			err.FinalErr = r.finalFn(r)
+			if err := r.finalFn(r); err != nil {
+				r.promiseErrChain = append(
+					r.promiseErrChain,
+					PromiseError{
+						stage: PromiseFinal,
+						err:   err,
+					},
+				)
+			}
 		}
 	}()
 
 	r.finish.Wait()
 
-	return &err
+	return r.GetError()
 }
 
 func NewSingleResult[T RHRiskData](execCode int, dataLen int) *SingleResult[T] {
@@ -214,18 +481,14 @@ func NewSingleResult[T RHRiskData](execCode int, dataLen int) *SingleResult[T] {
 	}
 
 	result := SingleResult[T]{
-		ExecCode: execCode,
-
-		baseResult: baseResult[T]{
-			startFlag:  make(chan struct{}),
-			notifyFlag: make(chan struct{}),
-			Data:       make(chan *T, dataLen),
-		},
+		execCode: execCode,
 	}
+
+	result.init()
 
 	if execCode != 0 {
 		close(result.notifyFlag)
-		close(result.Data)
+		close(result.data)
 	}
 
 	return &result
@@ -266,9 +529,9 @@ func (api *AsyncRHMonitorApi) OnRspUserLogin(login *RspUserLogin, info *RspInfo,
 	if async, exist := api.promiseCache.LoadAndDelete(reqID); exist {
 		result := async.(*SingleResult[RspUserLogin])
 
-		result.RspInfo = info
+		result.rspInfo = info
 
-		result.AppendResult(login, true)
+		result.AppendResult(reqID, login, true)
 	}
 }
 
@@ -287,9 +550,9 @@ func (api *AsyncRHMonitorApi) OnRspUserLogout(logout *RspUserLogout, info *RspIn
 	if async, exist := api.promiseCache.LoadAndDelete(reqID); exist {
 		result := async.(*SingleResult[RspUserLogout])
 
-		result.RspInfo = info
+		result.rspInfo = info
 
-		result.AppendResult(logout, true)
+		result.AppendResult(reqID, logout, true)
 	}
 }
 
@@ -308,11 +571,11 @@ func (api *AsyncRHMonitorApi) OnRspQryMonitorAccounts(investor *Investor, info *
 	if promise, exist := api.promiseCache.Load(reqID); exist {
 		result := promise.(*SingleResult[Investor])
 
-		if result.RspInfo == nil {
-			result.RspInfo = info
+		if result.rspInfo == nil {
+			result.rspInfo = info
 		}
 
-		result.AppendResult(investor, isLast)
+		result.AppendResult(reqID, investor, isLast)
 
 		if isLast {
 			api.promiseCache.Delete(reqID)
@@ -329,17 +592,38 @@ func (api *AsyncRHMonitorApi) AsyncReqQryInvestorMoney(investor *Investor) Resul
 	return result
 }
 
+func (api *AsyncRHMonitorApi) AsyncReqQryAllInvestorMoney() Result[Account] {
+	results := NewBatchResult[Account]()
+
+	api.requests.WaitInvestorReady()
+
+	api.investors.ForEach(func(s string, i *Investor) bool {
+		reqID, rtn := api.ExecReqQryInvestorMoney(i)
+
+		results.AppendRequest(int(reqID), rtn)
+
+		if rtn != 0 {
+			log.Printf("Query money for user[%s] failed: %d", i.InvestorID, rtn)
+			return false
+		}
+
+		return true
+	})
+
+	return results
+}
+
 func (api *AsyncRHMonitorApi) OnRspQryInvestorMoney(acct *Account, info *RspInfo, reqID int, isLast bool) {
 	api.RHMonitorApi.OnRspQryInvestorMoney(acct, info, reqID, isLast)
 
 	if async, exist := api.promiseCache.Load(reqID); exist {
 		result := async.(*SingleResult[Account])
 
-		if result.RspInfo == nil {
-			result.RspInfo = info
+		if result.rspInfo == nil {
+			result.rspInfo = info
 		}
 
-		result.AppendResult(acct, isLast)
+		result.AppendResult(reqID, acct, isLast)
 
 		if isLast {
 			api.promiseCache.Delete(reqID)
@@ -362,11 +646,11 @@ func (api *AsyncRHMonitorApi) OnRspQryInvestorPosition(pos *Position, info *RspI
 	if async, exist := api.promiseCache.Load(reqID); exist {
 		result := async.(*SingleResult[Position])
 
-		if result.RspInfo == nil {
-			result.RspInfo = info
+		if result.rspInfo == nil {
+			result.rspInfo = info
 		}
 
-		result.AppendResult(pos, isLast)
+		result.AppendResult(reqID, pos, isLast)
 
 		if isLast {
 			api.promiseCache.Delete(reqID)
@@ -389,11 +673,11 @@ func (api *AsyncRHMonitorApi) OnRspOffsetOrder(offset *OffsetOrder, info *RspInf
 	if async, exist := api.promiseCache.Load(reqID); exist {
 		result := async.(*SingleResult[OffsetOrder])
 
-		if result.RspInfo == nil {
-			result.RspInfo = info
+		if result.rspInfo == nil {
+			result.rspInfo = info
 		}
 
-		result.AppendResult(offset, isLast)
+		result.AppendResult(reqID, offset, isLast)
 
 		if isLast {
 			api.promiseCache.Delete(reqID)
@@ -416,7 +700,7 @@ func (api *AsyncRHMonitorApi) OnRtnOrder(order *Order) {
 	api.RHMonitorApi.OnRtnOrder(order)
 
 	if api.orderFlow != nil {
-		api.orderFlow.AppendResult(order, false)
+		api.orderFlow.AppendResult(-1, order, false)
 	}
 }
 
@@ -435,7 +719,7 @@ func (api *AsyncRHMonitorApi) OnRtnTrade(trade *Trade) {
 	api.RHMonitorApi.OnRtnTrade(trade)
 
 	if api.tradeFlow != nil {
-		api.tradeFlow.AppendResult(trade, false)
+		api.tradeFlow.AppendResult(-1, trade, false)
 	}
 }
 

@@ -26,29 +26,21 @@ type riskApi struct {
 }
 
 func reqFinalFn[T rohon.RHRiskData](result *Result) rohon.CallbackFn[T] {
-	return func(req *rohon.SingleResult[T]) error {
-		result.ReqId = int32(req.RequestID)
+	return func(req rohon.Result[T]) error {
+		result.ReqId = int32(req.GetRequestID())
 
-		if req.RspInfo != nil {
+		if rsp := req.GetRspInfo(); rsp != nil {
 			result.RspInfo = &RspInfo{
-				ErrorId:  int32(req.RspInfo.ErrorID),
-				ErrorMsg: req.RspInfo.ErrorMsg,
+				ErrorId:  int32(rsp.ErrorID),
+				ErrorMsg: rsp.ErrorMsg,
 			}
 		}
 		return nil
 	}
 }
 
-func checkPromise[T rohon.RHRiskData](promise rohon.Result[T], caller string) (rohon.Promise[T], error) {
-	if code := promise.GetExecCode(); code != 0 {
-		return nil, errors.Wrapf(
-			ErrRequestFailed,
-			"[%s] execution failed[%d]",
-			caller, code,
-		)
-	}
-
-	return promise, nil
+func checkPromise[T rohon.RHRiskData](result rohon.Result[T], caller string) (rohon.Promise[T], error) {
+	return result, result.GetError()
 }
 
 type riskHub struct {
@@ -124,8 +116,9 @@ func (hub *riskHub) ReqUserLogin(ctx context.Context, req *Request) (result *Res
 		return
 	}
 
-	if err = promise.Then(func(r *rohon.SingleResult[rohon.RspUserLogin]) error {
-		login := <-r.Data
+	if err = promise.Then(func(r rohon.Result[rohon.RspUserLogin]) error {
+
+		login := <-r.GetData()
 
 		var pri_type PrivilegeType
 
@@ -169,8 +162,8 @@ func (hub *riskHub) ReqUserLogout(ctx context.Context, req *Request) (result *Re
 		return
 	}
 
-	if err = promise.Then(func(r *rohon.SingleResult[rohon.RspUserLogout]) error {
-		logout := <-r.Data
+	if err = promise.Then(func(r rohon.Result[rohon.RspUserLogout]) error {
+		logout := <-r.GetData()
 
 		result.Response = &Result_UserLogout{
 			UserLogout: &RspUserLogout{
@@ -202,10 +195,10 @@ func (hub *riskHub) ReqQryMonitorAccounts(ctx context.Context, req *Request) (re
 		return
 	}
 
-	if err = promise.Then(func(r *rohon.SingleResult[rohon.Investor]) error {
+	if err = promise.Then(func(r rohon.Result[rohon.Investor]) error {
 		investors := InvestorList{}
 
-		for inv := range r.Data {
+		for inv := range r.GetData() {
 			investors.Data = append(investors.Data, &Investor{
 				BrokerId:   inv.BrokerID,
 				InvestorId: inv.InvestorID,
@@ -248,10 +241,10 @@ func (hub *riskHub) ReqQryInvestorMoney(ctx context.Context, req *Request) (resu
 		return
 	}
 
-	if err = promise.Then(func(r *rohon.SingleResult[rohon.Account]) error {
+	if err = promise.Then(func(r rohon.Result[rohon.Account]) error {
 		accounts := &AccountList{}
 
-		for acct := range r.Data {
+		for acct := range r.GetData() {
 			var currencyID CurrencyID
 			switch acct.CurrencyID {
 			case "USD":
@@ -335,9 +328,9 @@ func (hub *riskHub) ReqQryInvestorMoney(ctx context.Context, req *Request) (resu
 		result.Response = &Result_Accounts{Accounts: accounts}
 
 		return nil
-	}).Finally(func(r *rohon.SingleResult[rohon.Account]) error {
-		return nil
-	}).Await(ctx, hub.apiReqTimeout); err != nil {
+	}).Finally(
+		reqFinalFn[rohon.Account](result),
+	).Await(ctx, hub.apiReqTimeout); err != nil {
 		err = errors.Wrap(err, "[ReqQryInvestorMoney] wait rsp result failed")
 	}
 
