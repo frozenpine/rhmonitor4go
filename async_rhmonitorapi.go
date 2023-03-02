@@ -75,6 +75,8 @@ type Result[T RHRiskData] interface {
 }
 
 type baseResult[T RHRiskData] struct {
+	self Result[T]
+
 	data chan *T
 
 	startFlag chan struct{}
@@ -90,7 +92,8 @@ type baseResult[T RHRiskData] struct {
 	finalFn   CallbackFn[T]
 }
 
-func (r *baseResult[T]) init() {
+func (r *baseResult[T]) init(self Result[T]) {
+	r.self = self
 	r.data = make(chan *T)
 	r.startFlag = make(chan struct{})
 	r.notifyFlag = make(chan struct{})
@@ -106,6 +109,36 @@ func (r *baseResult[T]) waitAsyncData() {
 }
 
 func (r *baseResult[T]) IsBatch() bool { return false }
+
+func (r *baseResult[T]) Then(fn CallbackFn[T]) Promise[T] {
+	if r.self == nil {
+		panic("Self pointer missing")
+	}
+
+	r.successFn = fn
+
+	return r.self
+}
+
+func (r *baseResult[T]) Catch(fn CallbackFn[T]) Promise[T] {
+	if r.self == nil {
+		panic("Self pointer missing")
+	}
+
+	r.failFn = fn
+
+	return r.self
+}
+
+func (r *baseResult[T]) Finally(fn CallbackFn[T]) Promise[T] {
+	if r.self == nil {
+		panic("Self pointer missing")
+	}
+
+	r.finalFn = fn
+
+	return r.self
+}
 
 type BatchResult[T RHRiskData] struct {
 	baseResult[T]
@@ -197,24 +230,6 @@ func (r *BatchResult[T]) AppendResult(reqID int64, v *T, isLast bool) {
 	if all {
 		close(r.data)
 	}
-}
-
-func (r *BatchResult[T]) Then(fn CallbackFn[T]) Promise[T] {
-	r.successFn = fn
-
-	return r
-}
-
-func (r *BatchResult[T]) Catch(fn CallbackFn[T]) Promise[T] {
-	r.failFn = fn
-
-	return r
-}
-
-func (r *BatchResult[T]) Finally(fn CallbackFn[T]) Promise[T] {
-	r.finalFn = fn
-
-	return r
 }
 
 func (r *BatchResult[T]) Await(ctx context.Context, timeout time.Duration) error {
@@ -319,7 +334,7 @@ func NewBatchResult[T RHRiskData]() *BatchResult[T] {
 		rspInfoCache:   make(map[int64]chan *RspInfo),
 		rspStatusCache: make(map[int64]bool),
 	}
-	result.init()
+	result.init(&result)
 
 	return &result
 }
@@ -374,24 +389,6 @@ func (r *SingleResult[T]) AppendResult(reqID int64, v *T, isLast bool) {
 	if isLast {
 		close(r.data)
 	}
-}
-
-func (r *SingleResult[T]) Then(fn CallbackFn[T]) Promise[T] {
-	r.successFn = fn
-
-	return r
-}
-
-func (r *SingleResult[T]) Catch(fn CallbackFn[T]) Promise[T] {
-	r.failFn = fn
-
-	return r
-}
-
-func (r *SingleResult[T]) Finally(fn CallbackFn[T]) Promise[T] {
-	r.finalFn = fn
-
-	return r
 }
 
 func (r *SingleResult[T]) Await(ctx context.Context, timeout time.Duration) error {
@@ -486,7 +483,7 @@ func NewSingleResult[T RHRiskData](reqID int64, execCode int) *SingleResult[T] {
 		execCode:  execCode,
 	}
 
-	result.init()
+	result.init(&result)
 
 	if execCode != 0 {
 		close(result.notifyFlag)
