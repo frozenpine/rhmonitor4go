@@ -10,11 +10,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-const (
-	minDataLen = 1
-	maxDataLen = 10
-)
-
 type RHRiskData interface {
 	RspUserLogin | RspUserLogout | Investor | Account | Position | OffsetOrder | Order | Trade
 }

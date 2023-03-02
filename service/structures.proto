@@ -248,7 +248,7 @@ message RspUserLogin {
   string trading_day = 2;
   string login_time = 3;
   PrivilegeType privilege_type = 4;
-  string privilege_info = 5;
+  map<string, string> privilege_info = 5;
 }
 
 message RspUserLogout { string user_id = 1; }

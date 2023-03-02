@@ -136,7 +136,7 @@ func (hub *RiskHub) ReqUserLogin(ctx context.Context, req *Request) (result *Res
 				TradingDay:    login.TradingDay,
 				LoginTime:     login.LoginTime,
 				PrivilegeType: pri_type,
-				PrivilegeInfo: login.InfoPrivilegeType,
+				PrivilegeInfo: login.InfoPrivilegeType.ToDict(),
 			},
 		}
 		return nil

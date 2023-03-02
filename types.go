@@ -1,6 +1,8 @@
 package rhmonitor4go
 
-import "bytes"
+import (
+	"fmt"
+)
 
 type Reason uint16
 
@@ -21,38 +23,40 @@ const (
 	RH_MONITOR_NOMAL                                    // 普通用户
 )
 
-type InfoPrivilegeType [200]byte
-
 // 信息查看权限
 // [0]为全局强平模式, 整数0为不自动强平, 1为自动强平
 // [1]为全局交易模式, 整数0为按资金账户优先级报单, 1为按比例开仓, 2为净头寸模式
 // [2]与PrivilegeType相同
-func (info InfoPrivilegeType) String() string {
-	buffer := bytes.NewBufferString("{全局强平模式:")
+type InfoPrivilegeType [200]byte
+
+func (info InfoPrivilegeType) ToDict() map[string]string {
+	result := make(map[string]string)
+
+	var forceOff, tradeMode string = "未知模式", "未知模式"
 
 	switch info[0] {
 	case 0:
-		buffer.WriteString("不自动强平")
+		forceOff = "不自动强平"
 	case 1:
-		buffer.WriteString("自动强平")
-	default:
-		buffer.WriteString("未知模式")
+		forceOff = "自动强平"
 	}
+	result["ForceOffMode"] = forceOff
 
-	buffer.WriteString(" 全局交易模式:")
 	switch info[1] {
 	case 0:
-		buffer.WriteString("资金账户优先级报单")
+		tradeMode = "资金账户优先级报单"
 	case 1:
-		buffer.WriteString("按比例开仓")
+		tradeMode = "按比例开仓"
 	case 2:
-		buffer.WriteString("净头寸")
-	default:
-		buffer.WriteString("未知模式")
+		tradeMode = "净头寸"
 	}
+	result["TradeMode"] = tradeMode
 
-	buffer.WriteString("}")
-	return buffer.String()
+	return result
+}
+
+func (info InfoPrivilegeType) String() string {
+	return fmt.Sprint(info.ToDict())
 }
 
 type BusinessType uint8
