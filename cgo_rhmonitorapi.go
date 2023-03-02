@@ -357,7 +357,7 @@ func (api *RHMonitorApi) OnFrontDisconnected(reason Reason) {
 	api.requests.SetConnected(false)
 }
 
-func (api *RHMonitorApi) OnRspUserLogin(login *RspUserLogin, info *RspInfo, requestID int) {
+func (api *RHMonitorApi) OnRspUserLogin(login *RspUserLogin, info *RspInfo, requestID int64) {
 	if err := CheckRspInfo(info); err != nil {
 		log.Printf("User[%s] login failed: %v", api.riskUser.UserID, err)
 		return
@@ -376,7 +376,7 @@ func (api *RHMonitorApi) OnRspUserLogin(login *RspUserLogin, info *RspInfo, requ
 	}
 }
 
-func (api *RHMonitorApi) OnRspUserLogout(logout *RspUserLogout, info *RspInfo, requestID int) {
+func (api *RHMonitorApi) OnRspUserLogout(logout *RspUserLogout, info *RspInfo, requestID int64) {
 	if err := CheckRspInfo(info); err != nil {
 		log.Printf("User logout failed: %v", err)
 		return
@@ -391,7 +391,7 @@ func (api *RHMonitorApi) OnRspUserLogout(logout *RspUserLogout, info *RspInfo, r
 	}
 }
 
-func (api *RHMonitorApi) OnRspQryMonitorAccounts(investor *Investor, info *RspInfo, requestID int, isLast bool) {
+func (api *RHMonitorApi) OnRspQryMonitorAccounts(investor *Investor, info *RspInfo, requestID int64, isLast bool) {
 	if err := CheckRspInfo(info); err != nil {
 		log.Printf("Monitor account query failed: %v", err)
 		return
@@ -413,7 +413,7 @@ func (api *RHMonitorApi) OnRspQryMonitorAccounts(investor *Investor, info *RspIn
 	}
 }
 
-func (api *RHMonitorApi) OnRspQryInvestorMoney(account *Account, info *RspInfo, requestID int, isLast bool) {
+func (api *RHMonitorApi) OnRspQryInvestorMoney(account *Account, info *RspInfo, requestID int64, isLast bool) {
 	if err := CheckRspInfo(info); err != nil {
 		log.Printf("Investor money query failed: %v", err)
 		return
@@ -422,7 +422,7 @@ func (api *RHMonitorApi) OnRspQryInvestorMoney(account *Account, info *RspInfo, 
 	printData("OnRspQryInvestorMoney", account)
 }
 
-func (api *RHMonitorApi) OnRspQryInvestorPosition(position *Position, info *RspInfo, requestID int, isLast bool) {
+func (api *RHMonitorApi) OnRspQryInvestorPosition(position *Position, info *RspInfo, requestID int64, isLast bool) {
 	if err := CheckRspInfo(info); err != nil {
 		log.Printf("Investor position query failed: %v", err)
 
@@ -436,7 +436,7 @@ func (api *RHMonitorApi) OnRspQryInvestorPosition(position *Position, info *RspI
 	}
 }
 
-func (api *RHMonitorApi) OnRspOffsetOrder(offsetOrd *OffsetOrder, info *RspInfo, requestID int, isLast bool) {
+func (api *RHMonitorApi) OnRspOffsetOrder(offsetOrd *OffsetOrder, info *RspInfo, requestID int64, isLast bool) {
 	if err := CheckRspInfo(info); err != nil {
 		log.Printf(
 			"Offset order[%s %s: %d@%f] for investor[%s] failed: %v",

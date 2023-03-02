@@ -112,12 +112,12 @@ var (
 type RHRiskSpi interface {
 	OnFrontConnected()
 	OnFrontDisconnected(reason Reason)
-	OnRspUserLogin(*RspUserLogin, *RspInfo, int)
-	OnRspUserLogout(*RspUserLogout, *RspInfo, int)
-	OnRspQryMonitorAccounts(*Investor, *RspInfo, int, bool)
-	OnRspQryInvestorMoney(*Account, *RspInfo, int, bool)
-	OnRspQryInvestorPosition(*Position, *RspInfo, int, bool)
-	OnRspOffsetOrder(*OffsetOrder, *RspInfo, int, bool)
+	OnRspUserLogin(*RspUserLogin, *RspInfo, int64)
+	OnRspUserLogout(*RspUserLogout, *RspInfo, int64)
+	OnRspQryMonitorAccounts(*Investor, *RspInfo, int64, bool)
+	OnRspQryInvestorMoney(*Account, *RspInfo, int64, bool)
+	OnRspQryInvestorPosition(*Position, *RspInfo, int64, bool)
+	OnRspOffsetOrder(*OffsetOrder, *RspInfo, int64, bool)
 	OnRtnOrder(*Order)
 	OnRtnTrade(*Trade)
 	OnRtnInvestorMoney(*Account)
@@ -154,7 +154,7 @@ func cgoOnRspUserLogin(
 	login := NewFromCRHMonitorRspUserLoginField(pRspUserLoginField)
 	info := NewFromCRHRspInfoField(pRHRspInfoField)
 
-	getSpiInstance(instance).OnRspUserLogin(login, info, int(nRequestID))
+	getSpiInstance(instance).OnRspUserLogin(login, info, int64(nRequestID))
 }
 
 //export cgoOnRspUserLogout
@@ -166,7 +166,7 @@ func cgoOnRspUserLogout(
 	logout := NewFromCRHMonitorUserLogoutField(pRspUserLoginField)
 	info := NewFromCRHRspInfoField(pRHRspInfoField)
 
-	getSpiInstance(instance).OnRspUserLogout(logout, info, int(nRequestID))
+	getSpiInstance(instance).OnRspUserLogout(logout, info, int64(nRequestID))
 }
 
 //export cgoOnRspQryMonitorAccounts
@@ -180,7 +180,7 @@ func cgoOnRspQryMonitorAccounts(
 	info := NewFromCRHRspInfoField(pRHRspInfoField)
 
 	getSpiInstance(instance).OnRspQryMonitorAccounts(
-		investor, info, int(nRequestID), bool(isLast),
+		investor, info, int64(nRequestID), bool(isLast),
 	)
 }
 
@@ -195,7 +195,7 @@ func cgoOnRspQryInvestorMoney(
 	info := NewFromCRHRspInfoField(pRHRspInfoField)
 
 	getSpiInstance(instance).OnRspQryInvestorMoney(
-		account, info, int(nRequestID), bool(isLast),
+		account, info, int64(nRequestID), bool(isLast),
 	)
 }
 
@@ -210,7 +210,7 @@ func cgoOnRspQryInvestorPosition(
 	info := NewFromCRHRspInfoField(pRHRspInfoField)
 
 	getSpiInstance(instance).OnRspQryInvestorPosition(
-		pos, info, int(nRequestID), bool(isLast),
+		pos, info, int64(nRequestID), bool(isLast),
 	)
 }
 
@@ -225,7 +225,7 @@ func cgoOnRspOffsetOrder(
 	info := NewFromCRHRspInfoField(pRHRspInfoField)
 
 	getSpiInstance(instance).OnRspOffsetOrder(
-		offsetOrd, info, int(nRequestID), bool(isLast),
+		offsetOrd, info, int64(nRequestID), bool(isLast),
 	)
 }
 

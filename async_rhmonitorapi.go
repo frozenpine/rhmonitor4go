@@ -525,15 +525,15 @@ func (api *AsyncRHMonitorApi) AsyncReqUserLogin(login *RiskUser) Result[RspUserL
 	return result
 }
 
-func (api *AsyncRHMonitorApi) OnRspUserLogin(login *RspUserLogin, info *RspInfo, reqID int) {
+func (api *AsyncRHMonitorApi) OnRspUserLogin(login *RspUserLogin, info *RspInfo, reqID int64) {
 	api.RHMonitorApi.OnRspUserLogin(login, info, reqID)
 
-	if async, exist := api.promiseCache.LoadAndDelete(int64(reqID)); exist {
+	if async, exist := api.promiseCache.LoadAndDelete(reqID); exist {
 		result := async.(*SingleResult[RspUserLogin])
 
 		result.rspInfo = info
 
-		result.AppendResult(int64(reqID), login, true)
+		result.AppendResult(reqID, login, true)
 	}
 }
 
@@ -546,15 +546,15 @@ func (api *AsyncRHMonitorApi) AsyncReqUserLogout() Result[RspUserLogout] {
 	return result
 }
 
-func (api *AsyncRHMonitorApi) OnRspUserLogout(logout *RspUserLogout, info *RspInfo, reqID int) {
+func (api *AsyncRHMonitorApi) OnRspUserLogout(logout *RspUserLogout, info *RspInfo, reqID int64) {
 	api.RHMonitorApi.OnRspUserLogout(logout, info, reqID)
 
-	if async, exist := api.promiseCache.LoadAndDelete(int64(reqID)); exist {
+	if async, exist := api.promiseCache.LoadAndDelete(reqID); exist {
 		result := async.(*SingleResult[RspUserLogout])
 
 		result.rspInfo = info
 
-		result.AppendResult(int64(reqID), logout, true)
+		result.AppendResult(reqID, logout, true)
 	}
 }
 
@@ -568,17 +568,17 @@ func (api *AsyncRHMonitorApi) AsyncReqQryMonitorAccounts() Result[Investor] {
 	return result
 }
 
-func (api *AsyncRHMonitorApi) OnRspQryMonitorAccounts(investor *Investor, info *RspInfo, reqID int, isLast bool) {
+func (api *AsyncRHMonitorApi) OnRspQryMonitorAccounts(investor *Investor, info *RspInfo, reqID int64, isLast bool) {
 	api.RHMonitorApi.OnRspQryMonitorAccounts(investor, info, reqID, isLast)
 
-	if promise, exist := api.promiseCache.Load(int64(reqID)); exist {
+	if promise, exist := api.promiseCache.Load(reqID); exist {
 		result := promise.(*SingleResult[Investor])
 
 		if result.rspInfo == nil {
 			result.rspInfo = info
 		}
 
-		result.AppendResult(int64(reqID), investor, isLast)
+		result.AppendResult(reqID, investor, isLast)
 
 		if isLast {
 			api.promiseCache.Delete(reqID)
@@ -616,17 +616,17 @@ func (api *AsyncRHMonitorApi) AsyncReqQryAllInvestorMoney() Result[Account] {
 	return results
 }
 
-func (api *AsyncRHMonitorApi) OnRspQryInvestorMoney(acct *Account, info *RspInfo, reqID int, isLast bool) {
+func (api *AsyncRHMonitorApi) OnRspQryInvestorMoney(acct *Account, info *RspInfo, reqID int64, isLast bool) {
 	api.RHMonitorApi.OnRspQryInvestorMoney(acct, info, reqID, isLast)
 
-	if async, exist := api.promiseCache.Load(int64(reqID)); exist {
+	if async, exist := api.promiseCache.Load(reqID); exist {
 		result := async.(*SingleResult[Account])
 
 		if result.rspInfo == nil {
 			result.rspInfo = info
 		}
 
-		result.AppendResult(int64(reqID), acct, isLast)
+		result.AppendResult(reqID, acct, isLast)
 
 		if isLast {
 			api.promiseCache.Delete(reqID)
@@ -643,17 +643,17 @@ func (api *AsyncRHMonitorApi) AsyncReqQryInvestorPosition(investor *Investor, in
 	return result
 }
 
-func (api *AsyncRHMonitorApi) OnRspQryInvestorPosition(pos *Position, info *RspInfo, reqID int, isLast bool) {
+func (api *AsyncRHMonitorApi) OnRspQryInvestorPosition(pos *Position, info *RspInfo, reqID int64, isLast bool) {
 	api.RHMonitorApi.OnRspQryInvestorPosition(pos, info, reqID, isLast)
 
-	if async, exist := api.promiseCache.Load(int64(reqID)); exist {
+	if async, exist := api.promiseCache.Load(reqID); exist {
 		result := async.(*SingleResult[Position])
 
 		if result.rspInfo == nil {
 			result.rspInfo = info
 		}
 
-		result.AppendResult(int64(reqID), pos, isLast)
+		result.AppendResult(reqID, pos, isLast)
 
 		if isLast {
 			api.promiseCache.Delete(reqID)
@@ -670,17 +670,17 @@ func (api *AsyncRHMonitorApi) AsyncReqOffsetOrder(offset *OffsetOrder) Result[Of
 	return result
 }
 
-func (api *AsyncRHMonitorApi) OnRspOffsetOrder(offset *OffsetOrder, info *RspInfo, reqID int, isLast bool) {
+func (api *AsyncRHMonitorApi) OnRspOffsetOrder(offset *OffsetOrder, info *RspInfo, reqID int64, isLast bool) {
 	api.RHMonitorApi.OnRspOffsetOrder(offset, info, reqID, isLast)
 
-	if async, exist := api.promiseCache.Load(int64(reqID)); exist {
+	if async, exist := api.promiseCache.Load(reqID); exist {
 		result := async.(*SingleResult[OffsetOrder])
 
 		if result.rspInfo == nil {
 			result.rspInfo = info
 		}
 
-		result.AppendResult(int64(reqID), offset, isLast)
+		result.AppendResult(reqID, offset, isLast)
 
 		if isLast {
 			api.promiseCache.Delete(reqID)
