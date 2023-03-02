@@ -14,9 +14,9 @@ func _() {
 	_ = x[RH_TRADE_ORDT_Combination-51]
 	_ = x[RH_TRADE_ORDT_ConditionalOrder-52]
 	_ = x[RH_TRADE_ORDT_Swap-53]
-	_ = x[RH_TRADE_ORDT_FinancingBuy-71]
-	_ = x[RH_TRADE_ORDT_SellRepayMoney-72]
-	_ = x[RH_TRADE_ORDT_FinancingSell-73]
+	_ = x[RH_TRADE_ORDT_FinancingBuy-65]
+	_ = x[RH_TRADE_ORDT_SellRepayMoney-66]
+	_ = x[RH_TRADE_ORDT_FinancingSell-67]
 	_ = x[RH_TRADE_ORDT_RepayStock-82]
 }
 
@@ -36,8 +36,8 @@ func (i OrderType) String() string {
 	case 48 <= i && i <= 53:
 		i -= 48
 		return _OrderType_name_0[_OrderType_index_0[i]:_OrderType_index_0[i+1]]
-	case 71 <= i && i <= 73:
-		i -= 71
+	case 65 <= i && i <= 67:
+		i -= 65
 		return _OrderType_name_1[_OrderType_index_1[i]:_OrderType_index_1[i+1]]
 	case i == 82:
 		return _OrderType_name_2

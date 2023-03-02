@@ -18,9 +18,9 @@ func _() {
 	_ = x[RH_TRADE_OSRC_ServerCondiOrder-55]
 	_ = x[RH_TRADE_OSRC_ServerLossOrder-56]
 	_ = x[RH_TRADE_OSRC_ServerProfitOrder-57]
-	_ = x[RH_TRADE_OSRC_ServerLossEnsureOrder-107]
-	_ = x[RH_TRADE_OSRC_ServerProfitEnsureOrder-108]
-	_ = x[RH_TRADE_OSRC_ServerParkedOrder-109]
+	_ = x[RH_TRADE_OSRC_ServerLossEnsureOrder-97]
+	_ = x[RH_TRADE_OSRC_ServerProfitEnsureOrder-98]
+	_ = x[RH_TRADE_OSRC_ServerParkedOrder-99]
 }
 
 const (
@@ -38,8 +38,8 @@ func (i OrderSource) String() string {
 	case 48 <= i && i <= 57:
 		i -= 48
 		return _OrderSource_name_0[_OrderSource_index_0[i]:_OrderSource_index_0[i+1]]
-	case 107 <= i && i <= 109:
-		i -= 107
+	case 97 <= i && i <= 99:
+		i -= 97
 		return _OrderSource_name_1[_OrderSource_index_1[i]:_OrderSource_index_1[i+1]]
 	default:
 		return "OrderSource(" + strconv.FormatInt(int64(i), 10) + ")"

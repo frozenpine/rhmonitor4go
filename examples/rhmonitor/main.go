@@ -35,6 +35,7 @@ func (api *myApi) OnFrontConnected() {
 
 func main() {
 	api := &myApi{}
+	// api := &rohon.RHMonitorApi{}
 
 	log.Printf("Instance: %p", api)
 
@@ -52,17 +53,34 @@ func main() {
 		Password: riskPass,
 	}
 
-	api.ReqUserLogin(&login)
+	var (
+		reqID int64
+		rtn   int
+	)
 
-	api.ReqQryMonitorAccounts()
+	if reqID, rtn = api.ReqUserLogin(&login); rtn != 0 {
+		log.Fatalf("ReqUserLogin[%d] faield: %d", reqID, rtn)
+	}
 
-	api.ReqQryAllInvestorMoney()
+	if reqID, rtn = api.ReqQryMonitorAccounts(); rtn != 0 {
+		log.Fatalf("ReqQryMonitorAccounts[%d] failed: %d", reqID, rtn)
+	}
 
-	api.ReqQryAllInvestorPosition()
+	if rtn = api.ReqQryAllInvestorMoney(); rtn != 0 {
+		log.Fatalf("ReqQryAllInvestorMoney failed: %d", rtn)
+	}
 
-	// api.ReqSubAllInvestorOrder()
+	if rtn = api.ReqQryAllInvestorPosition(); rtn != 0 {
+		log.Fatalf("ReqQryAllInvestorPosition failed: %d", rtn)
+	}
 
-	api.ReqSubAllInvestorTrade()
+	if rtn = api.ReqSubAllInvestorOrder(); rtn != 0 {
+		log.Fatalf("ReqSubAllInvestorOrder failed: %d", rtn)
+	}
+
+	if rtn = api.ReqSubAllInvestorTrade(); rtn != 0 {
+		log.Fatalf("ReqSubAllInvestorTrade failed: %d", rtn)
+	}
 
 	<-ctx.Done()
 }

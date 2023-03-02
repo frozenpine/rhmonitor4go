@@ -14,10 +14,10 @@ func _() {
 	_ = x[RH_TRADE_OST_NoTradeQueueing-51]
 	_ = x[RH_TRADE_OST_NoTradeNotQueueing-52]
 	_ = x[RH_TRADE_OST_Canceled-53]
-	_ = x[RH_TRADE_OST_Unknown-103]
-	_ = x[RH_TRADE_OST_NotTouched-104]
-	_ = x[RH_TRADE_OST_Touched-105]
-	_ = x[RH_TRADE_OST_Submitted-106]
+	_ = x[RH_TRADE_OST_Unknown-97]
+	_ = x[RH_TRADE_OST_NotTouched-98]
+	_ = x[RH_TRADE_OST_Touched-99]
+	_ = x[RH_TRADE_OST_Submitted-100]
 	_ = x[RH_TRADE_OST_Amending-109]
 }
 
@@ -37,8 +37,8 @@ func (i OrderStatus) String() string {
 	case 48 <= i && i <= 53:
 		i -= 48
 		return _OrderStatus_name_0[_OrderStatus_index_0[i]:_OrderStatus_index_0[i+1]]
-	case 103 <= i && i <= 106:
-		i -= 103
+	case 97 <= i && i <= 100:
+		i -= 97
 		return _OrderStatus_name_1[_OrderStatus_index_1[i]:_OrderStatus_index_1[i+1]]
 	case i == 109:
 		return _OrderStatus_name_2

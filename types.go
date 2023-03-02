@@ -71,6 +71,8 @@ const (
 	RH_TRADE_OPT_LastPricePlusThreeTicks                             // 最新价浮动上浮3个ticks
 	RH_TRADE_OPT_AskPrice1                                           // 卖一价
 	RH_TRADE_OPT_AskPrice1PlusOneTicks                               // 卖一价浮动上浮1个ticks
+)
+const (
 	RH_TRADE_OPT_AskPrice1PlusTwoTicks   OrderPriceType = 'A' + iota // 卖一价浮动上浮2个ticks
 	RH_TRADE_OPT_AskPrice1PlusThreeTicks                             // 卖一价浮动上浮3个ticks
 	RH_TRADE_OPT_BidPrice1                                           // 买一价
@@ -122,14 +124,16 @@ const (
 	RH_TRADE_CC_LastPriceLesserThanStopPrice                                    // 最新价小于条件价
 	RH_TRADE_CC_LastPriceLesserEqualStopPrice                                   // 最新价小于等于条件价
 	RH_TRADE_CC_AskPriceGreaterThanStopPrice                                    // 卖一价大于条件价
-	RH_TRADE_CC_AskPriceGreaterEqualStopPrice  ContingentCondition = 'A' + iota // 卖一价大于等于条件价
-	RH_TRADE_CC_AskPriceLesserThanStopPrice                                     // 卖一价小于条件价
-	RH_TRADE_CC_AskPriceLesserEqualStopPrice                                    // 卖一价小于等于条件价
-	RH_TRADE_CC_BidPriceGreaterThanStopPrice                                    // 买一价大于条件价
-	RH_TRADE_CC_BidPriceGreaterEqualStopPrice                                   // 买一价大于等于条件价
-	RH_TRADE_CC_BidPriceLesserThanStopPrice                                     // 买一价小于条件价
-	RH_TRADE_CC_BidPriceLesserEqualStopPrice   ContingentCondition = 'H'        // 买一价小于等于条件价
-	RH_TRADE_CC_CloseYDFirst                   ContingentCondition = 'Z'        // 开空指令转换为平昨仓优先
+)
+const (
+	RH_TRADE_CC_AskPriceGreaterEqualStopPrice ContingentCondition = 'A' + iota // 卖一价大于等于条件价
+	RH_TRADE_CC_AskPriceLesserThanStopPrice                                    // 卖一价小于条件价
+	RH_TRADE_CC_AskPriceLesserEqualStopPrice                                   // 卖一价小于等于条件价
+	RH_TRADE_CC_BidPriceGreaterThanStopPrice                                   // 买一价大于条件价
+	RH_TRADE_CC_BidPriceGreaterEqualStopPrice                                  // 买一价大于等于条件价
+	RH_TRADE_CC_BidPriceLesserThanStopPrice                                    // 买一价小于条件价
+	RH_TRADE_CC_BidPriceLesserEqualStopPrice  ContingentCondition = 'H'        // 买一价小于等于条件价
+	RH_TRADE_CC_CloseYDFirst                  ContingentCondition = 'Z'        // 开空指令转换为平昨仓优先
 )
 
 type ForceCloseReason uint8
@@ -163,16 +167,18 @@ type OrderSource uint8
 
 //go:generate stringer -type OrderSource -linecomment
 const (
-	RH_TRADE_OSRC_Participant             OrderSource = '0' + iota // 来自参与者
-	RH_TRADE_OSRC_Administrator                                    // 来自管理员
-	RH_TRADE_OSRC_QryOrder                                         // 查询报单
-	RH_TRADE_OSRC_MonitorForceOrder                                // 来自于风控的强平单
-	RH_TRADE_OSRC_RiskForceOrder                                   // 触发风险后的强平单
-	RH_TRADE_OSRC_MonitorThirdOrder                                // 风控端第三方报单
-	RH_TRADE_OSRC_RealObjThirdOrder                                // 资金账户外部报单后自动映射的报单
-	RH_TRADE_OSRC_ServerCondiOrder                                 // 服务器条件单
-	RH_TRADE_OSRC_ServerLossOrder                                  // 服务器止损单
-	RH_TRADE_OSRC_ServerProfitOrder                                // 服务器止盈单
+	RH_TRADE_OSRC_Participant       OrderSource = '0' + iota // 来自参与者
+	RH_TRADE_OSRC_Administrator                              // 来自管理员
+	RH_TRADE_OSRC_QryOrder                                   // 查询报单
+	RH_TRADE_OSRC_MonitorForceOrder                          // 来自于风控的强平单
+	RH_TRADE_OSRC_RiskForceOrder                             // 触发风险后的强平单
+	RH_TRADE_OSRC_MonitorThirdOrder                          // 风控端第三方报单
+	RH_TRADE_OSRC_RealObjThirdOrder                          // 资金账户外部报单后自动映射的报单
+	RH_TRADE_OSRC_ServerCondiOrder                           // 服务器条件单
+	RH_TRADE_OSRC_ServerLossOrder                            // 服务器止损单
+	RH_TRADE_OSRC_ServerProfitOrder                          // 服务器止盈单
+)
+const (
 	RH_TRADE_OSRC_ServerLossEnsureOrder   OrderSource = 'a' + iota // 服务器止损追单
 	RH_TRADE_OSRC_ServerProfitEnsureOrder                          // 服务器止盈追单
 	RH_TRADE_OSRC_ServerParkedOrder                                // 服务器预埋单
@@ -188,11 +194,13 @@ const (
 	RH_TRADE_OST_NoTradeQueueing                                // 未成交还在队列中
 	RH_TRADE_OST_NoTradeNotQueueing                             // 未成交不在队列中
 	RH_TRADE_OST_Canceled                                       // 撤单
-	RH_TRADE_OST_Unknown               OrderStatus = 'a' + iota // 未知
-	RH_TRADE_OST_NotTouched                                     // 尚未触发
-	RH_TRADE_OST_Touched                                        // 已触发
-	RH_TRADE_OST_Submitted                                      // 已提交
-	RH_TRADE_OST_Amending              OrderStatus = 'm'        // 正在修改
+)
+const (
+	RH_TRADE_OST_Unknown    OrderStatus = 'a' + iota // 未知
+	RH_TRADE_OST_NotTouched                          // 尚未触发
+	RH_TRADE_OST_Touched                             // 已触发
+	RH_TRADE_OST_Submitted                           // 已提交
+	RH_TRADE_OST_Amending   OrderStatus = 'm'        // 正在修改
 )
 
 type OrderType uint8
@@ -205,10 +213,12 @@ const (
 	RH_TRADE_ORDT_Combination                                  // 组合报单
 	RH_TRADE_ORDT_ConditionalOrder                             // 条件单
 	RH_TRADE_ORDT_Swap                                         // 互换单
-	RH_TRADE_ORDT_FinancingBuy          OrderType = 'A' + iota // 融资买入单
-	RH_TRADE_ORDT_SellRepayMoney                               // 卖券还款
-	RH_TRADE_ORDT_FinancingSell                                // 融资平仓
-	RH_TRADE_ORDT_RepayStock            OrderType = 'R'        // 现券还券
+)
+const (
+	RH_TRADE_ORDT_FinancingBuy   OrderType = 'A' + iota // 融资买入单
+	RH_TRADE_ORDT_SellRepayMoney                        // 卖券还款
+	RH_TRADE_ORDT_FinancingSell                         // 融资平仓
+	RH_TRADE_ORDT_RepayStock     OrderType = 'R'        // 现券还券
 )
 
 type TradingRole uint8
@@ -230,9 +240,11 @@ const (
 	RH_TRADE_TRDT_OTC                                       // OTC成交
 	RH_TRADE_TRDT_EFPDerived                                // 期转现衍生成交
 	RH_TRADE_TRDT_CombinationDerived                        // 组合衍生成交
-	RH_TRADE_TRDT_FinancingBuy       TradeType = 'F'        // 融资买入成交
-	RH_TRADE_TRDT_RepayStock_Auto    TradeType = 'R'        // 卖平今的现券还券
-	RH_TRADE_TRDT_RepayStock_Manual  TradeType = 'S'        // 正常的现券还券指令
+)
+const (
+	RH_TRADE_TRDT_FinancingBuy      TradeType = 'F' // 融资买入成交
+	RH_TRADE_TRDT_RepayStock_Auto   TradeType = 'R' // 卖平今的现券还券
+	RH_TRADE_TRDT_RepayStock_Manual TradeType = 'S' // 正常的现券还券指令
 )
 
 type PriceSource uint8

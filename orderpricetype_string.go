@@ -17,21 +17,21 @@ func _() {
 	_ = x[RH_TRADE_OPT_LastPricePlusThreeTicks-55]
 	_ = x[RH_TRADE_OPT_AskPrice1-56]
 	_ = x[RH_TRADE_OPT_AskPrice1PlusOneTicks-57]
-	_ = x[RH_TRADE_OPT_AskPrice1PlusTwoTicks-74]
-	_ = x[RH_TRADE_OPT_AskPrice1PlusThreeTicks-75]
-	_ = x[RH_TRADE_OPT_BidPrice1-76]
-	_ = x[RH_TRADE_OPT_BidPrice1PlusOneTicks-77]
-	_ = x[RH_TRADE_OPT_BidPrice1PlusTwoTicks-78]
-	_ = x[RH_TRADE_OPT_BidPrice1PlusThreeTicks-79]
-	_ = x[RH_TRADE_OPT_FiveLevelPrice-80]
-	_ = x[RH_TRADE_STOPLOSS_MARKET-81]
-	_ = x[RH_TRADE_STOPLOSS_LIMIT-82]
-	_ = x[RH_TRADE_GTC_LIMIT-83]
-	_ = x[RH_TRADE_STOCK_LEND-84]
-	_ = x[RH_TRADE_STOCK_FINANCING_BUY-85]
-	_ = x[RH_TRADE_REPAY_STOCK-86]
-	_ = x[RH_TRADE_ETF_PURCHASE-87]
-	_ = x[RH_TRADE_ETF_REDEMPTION-88]
+	_ = x[RH_TRADE_OPT_AskPrice1PlusTwoTicks-65]
+	_ = x[RH_TRADE_OPT_AskPrice1PlusThreeTicks-66]
+	_ = x[RH_TRADE_OPT_BidPrice1-67]
+	_ = x[RH_TRADE_OPT_BidPrice1PlusOneTicks-68]
+	_ = x[RH_TRADE_OPT_BidPrice1PlusTwoTicks-69]
+	_ = x[RH_TRADE_OPT_BidPrice1PlusThreeTicks-70]
+	_ = x[RH_TRADE_OPT_FiveLevelPrice-71]
+	_ = x[RH_TRADE_STOPLOSS_MARKET-72]
+	_ = x[RH_TRADE_STOPLOSS_LIMIT-73]
+	_ = x[RH_TRADE_GTC_LIMIT-74]
+	_ = x[RH_TRADE_STOCK_LEND-75]
+	_ = x[RH_TRADE_STOCK_FINANCING_BUY-76]
+	_ = x[RH_TRADE_REPAY_STOCK-77]
+	_ = x[RH_TRADE_ETF_PURCHASE-78]
+	_ = x[RH_TRADE_ETF_REDEMPTION-79]
 }
 
 const (
@@ -49,8 +49,8 @@ func (i OrderPriceType) String() string {
 	case 49 <= i && i <= 57:
 		i -= 49
 		return _OrderPriceType_name_0[_OrderPriceType_index_0[i]:_OrderPriceType_index_0[i+1]]
-	case 74 <= i && i <= 88:
-		i -= 74
+	case 65 <= i && i <= 79:
+		i -= 65
 		return _OrderPriceType_name_1[_OrderPriceType_index_1[i]:_OrderPriceType_index_1[i+1]]
 	default:
 		return "OrderPriceType(" + strconv.FormatInt(int64(i), 10) + ")"

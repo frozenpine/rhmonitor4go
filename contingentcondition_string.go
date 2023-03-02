@@ -17,26 +17,26 @@ func _() {
 	_ = x[RH_TRADE_CC_LastPriceLesserThanStopPrice-55]
 	_ = x[RH_TRADE_CC_LastPriceLesserEqualStopPrice-56]
 	_ = x[RH_TRADE_CC_AskPriceGreaterThanStopPrice-57]
-	_ = x[RH_TRADE_CC_AskPriceGreaterEqualStopPrice-74]
-	_ = x[RH_TRADE_CC_AskPriceLesserThanStopPrice-75]
-	_ = x[RH_TRADE_CC_AskPriceLesserEqualStopPrice-76]
-	_ = x[RH_TRADE_CC_BidPriceGreaterThanStopPrice-77]
-	_ = x[RH_TRADE_CC_BidPriceGreaterEqualStopPrice-78]
-	_ = x[RH_TRADE_CC_BidPriceLesserThanStopPrice-79]
+	_ = x[RH_TRADE_CC_AskPriceGreaterEqualStopPrice-65]
+	_ = x[RH_TRADE_CC_AskPriceLesserThanStopPrice-66]
+	_ = x[RH_TRADE_CC_AskPriceLesserEqualStopPrice-67]
+	_ = x[RH_TRADE_CC_BidPriceGreaterThanStopPrice-68]
+	_ = x[RH_TRADE_CC_BidPriceGreaterEqualStopPrice-69]
+	_ = x[RH_TRADE_CC_BidPriceLesserThanStopPrice-70]
 	_ = x[RH_TRADE_CC_BidPriceLesserEqualStopPrice-72]
 	_ = x[RH_TRADE_CC_CloseYDFirst-90]
 }
 
 const (
 	_ContingentCondition_name_0 = "立即止损止赢预埋单最新价大于条件价最新价大于等于条件价最新价小于条件价最新价小于等于条件价卖一价大于条件价"
-	_ContingentCondition_name_1 = "买一价小于等于条件价"
-	_ContingentCondition_name_2 = "卖一价大于等于条件价卖一价小于条件价卖一价小于等于条件价买一价大于条件价买一价大于等于条件价买一价小于条件价"
+	_ContingentCondition_name_1 = "卖一价大于等于条件价卖一价小于条件价卖一价小于等于条件价买一价大于条件价买一价大于等于条件价买一价小于条件价"
+	_ContingentCondition_name_2 = "买一价小于等于条件价"
 	_ContingentCondition_name_3 = "开空指令转换为平昨仓优先"
 )
 
 var (
 	_ContingentCondition_index_0 = [...]uint8{0, 6, 12, 18, 27, 51, 81, 105, 135, 159}
-	_ContingentCondition_index_2 = [...]uint8{0, 30, 54, 84, 108, 138, 162}
+	_ContingentCondition_index_1 = [...]uint8{0, 30, 54, 84, 108, 138, 162}
 )
 
 func (i ContingentCondition) String() string {
@@ -44,11 +44,11 @@ func (i ContingentCondition) String() string {
 	case 49 <= i && i <= 57:
 		i -= 49
 		return _ContingentCondition_name_0[_ContingentCondition_index_0[i]:_ContingentCondition_index_0[i+1]]
+	case 65 <= i && i <= 70:
+		i -= 65
+		return _ContingentCondition_name_1[_ContingentCondition_index_1[i]:_ContingentCondition_index_1[i+1]]
 	case i == 72:
-		return _ContingentCondition_name_1
-	case 74 <= i && i <= 79:
-		i -= 74
-		return _ContingentCondition_name_2[_ContingentCondition_index_2[i]:_ContingentCondition_index_2[i+1]]
+		return _ContingentCondition_name_2
 	case i == 90:
 		return _ContingentCondition_name_3
 	default:
