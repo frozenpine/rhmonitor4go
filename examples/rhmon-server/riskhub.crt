@@ -1,0 +1,87 @@
+Certificate:
+    Data:
+        Version: 3 (0x2)
+        Serial Number:
+            4c:54:99:00:14:cc:65:f0:55:48:ef:cc:e5:62:9a:5d
+        Signature Algorithm: sha256WithRSAEncryption
+        Issuer: CN=lingma.vip
+        Validity
+            Not Before: Mar  1 09:42:44 2023 GMT
+            Not After : Jun  3 09:42:44 2025 GMT
+        Subject: CN=riskhub
+        Subject Public Key Info:
+            Public Key Algorithm: rsaEncryption
+                RSA Public-Key: (2048 bit)
+                Modulus:
+                    00:bf:52:ee:66:6d:1b:4a:60:88:d7:b2:25:76:42:
+                    bb:8a:f0:34:c6:2c:26:1b:85:0c:80:e5:95:0c:10:
+                    c1:95:ab:18:96:b7:03:0e:d7:84:b2:3f:63:cf:da:
+                    5c:86:c2:36:0c:4a:76:f5:03:66:59:e4:4f:c3:4a:
+                    f8:ff:11:a9:f6:b2:8c:97:7a:1c:b9:8a:6a:e0:2b:
+                    92:90:c7:93:89:85:4e:f1:63:92:67:d1:0d:0b:76:
+                    26:84:e7:c6:bb:60:97:2f:26:d0:a2:4a:f5:60:ab:
+                    fd:3a:11:35:7b:77:1e:6f:36:f7:17:8c:ad:ab:fe:
+                    69:6c:5f:8e:41:28:8f:4e:b2:0c:02:78:50:a6:89:
+                    9d:1c:b0:9a:85:a4:a1:70:ee:ec:f9:4d:f1:05:3f:
+                    c6:c7:87:74:1d:52:41:cb:02:11:ca:e4:6c:91:92:
+                    35:a0:4d:3e:32:16:11:5b:e6:24:bb:32:38:eb:25:
+                    52:c8:55:a3:42:2a:06:30:6b:7a:87:aa:99:83:90:
+                    50:76:5d:7f:9e:5b:79:84:c8:f6:6d:eb:5c:83:03:
+                    ea:d8:7f:d0:d6:69:26:cf:62:49:0a:59:42:91:bd:
+                    fb:d2:b4:db:96:01:bd:64:bc:31:31:40:b0:05:33:
+                    3b:23:95:fa:4f:3e:4f:23:1b:98:2f:9d:0d:1a:ac:
+                    c9:6d
+                Exponent: 65537 (0x10001)
+        X509v3 extensions:
+            X509v3 Basic Constraints: 
+                CA:FALSE
+            X509v3 Subject Key Identifier: 
+                F0:CE:8C:3B:29:1B:74:3B:D8:B5:81:D3:EE:EB:93:C1:5C:9C:60:D9
+            X509v3 Authority Key Identifier: 
+                keyid:4D:E1:AF:6B:48:31:25:E1:27:16:4C:0F:87:96:B7:AF:3F:61:98:1F
+                DirName:/CN=lingma.vip
+                serial:45:3D:50:C0:F8:BC:CD:0F:FA:68:E0:92:5A:6B:89:4F:FB:6D:EE:A2
+
+            X509v3 Extended Key Usage: 
+                TLS Web Server Authentication
+            X509v3 Key Usage: 
+                Digital Signature, Key Encipherment
+            X509v3 Subject Alternative Name: 
+                DNS:riskhub
+    Signature Algorithm: sha256WithRSAEncryption
+         dc:88:bc:73:7b:c2:4c:5c:d8:6f:e2:81:84:65:9f:3d:0d:00:
+         8a:4d:18:96:1a:0d:a2:c1:98:20:f2:fd:3c:60:b9:12:d4:db:
+         dc:72:d3:4e:76:eb:40:9d:46:cf:cf:24:14:7f:2f:bc:05:b3:
+         9b:23:c5:41:86:a7:a6:33:e4:da:34:53:6a:27:97:2f:f3:6e:
+         2f:77:43:e8:6c:9d:3b:3d:0d:ac:24:77:8d:35:a7:3d:ac:a5:
+         5e:d6:d5:66:30:0f:50:64:66:96:01:96:81:c1:9d:4a:82:5e:
+         3a:bd:78:04:71:31:5e:0a:53:11:f6:fb:24:d1:1b:e5:1f:be:
+         7c:39:15:90:36:5a:a2:a9:bb:7c:cd:21:92:97:bf:a6:48:09:
+         c7:4b:e0:8c:0a:3b:3f:7d:9d:ac:a3:0d:17:1f:1c:02:ca:ea:
+         50:35:67:e6:74:82:12:7f:de:4c:0f:3f:2e:65:9b:20:de:42:
+         49:7d:9d:f4:47:a7:08:1c:6c:22:47:d3:ca:ce:bb:f0:6e:d9:
+         2e:47:7b:c1:07:6c:02:5c:f9:59:ed:6e:f2:a0:94:68:af:62:
+         80:c9:fc:42:2d:5d:3b:68:85:f0:d2:ad:9a:e9:b6:83:6c:18:
+         94:68:ad:fc:0b:70:cd:dd:79:3d:ac:de:b9:9a:29:ce:4a:48:
+         94:60:79:11
+-----BEGIN CERTIFICATE-----
+MIIDZzCCAk+gAwIBAgIQTFSZABTMZfBVSO/M5WKaXTANBgkqhkiG9w0BAQsFADAV
+MRMwEQYDVQQDDApsaW5nbWEudmlwMB4XDTIzMDMwMTA5NDI0NFoXDTI1MDYwMzA5
+NDI0NFowEjEQMA4GA1UEAwwHcmlza2h1YjCCASIwDQYJKoZIhvcNAQEBBQADggEP
+ADCCAQoCggEBAL9S7mZtG0pgiNeyJXZCu4rwNMYsJhuFDIDllQwQwZWrGJa3Aw7X
+hLI/Y8/aXIbCNgxKdvUDZlnkT8NK+P8RqfayjJd6HLmKauArkpDHk4mFTvFjkmfR
+DQt2JoTnxrtgly8m0KJK9WCr/ToRNXt3Hm829xeMrav+aWxfjkEoj06yDAJ4UKaJ
+nRywmoWkoXDu7PlN8QU/xseHdB1SQcsCEcrkbJGSNaBNPjIWEVvmJLsyOOslUshV
+o0IqBjBreoeqmYOQUHZdf55beYTI9m3rXIMD6th/0NZpJs9iSQpZQpG9+9K025YB
+vWS8MTFAsAUzOyOV+k8+TyMbmC+dDRqsyW0CAwEAAaOBtTCBsjAJBgNVHRMEAjAA
+MB0GA1UdDgQWBBTwzow7KRt0O9i1gdPu65PBXJxg2TBQBgNVHSMESTBHgBRN4a9r
+SDEl4ScWTA+HlrevP2GYH6EZpBcwFTETMBEGA1UEAwwKbGluZ21hLnZpcIIURT1Q
+wPi8zQ/6aOCSWmuJT/tt7qIwEwYDVR0lBAwwCgYIKwYBBQUHAwEwCwYDVR0PBAQD
+AgWgMBIGA1UdEQQLMAmCB3Jpc2todWIwDQYJKoZIhvcNAQELBQADggEBANyIvHN7
+wkxc2G/igYRlnz0NAIpNGJYaDaLBmCDy/TxguRLU29xy005260CdRs/PJBR/L7wF
+s5sjxUGGp6Yz5No0U2only/zbi93Q+hsnTs9Dawkd401pz2spV7W1WYwD1BkZpYB
+loHBnUqCXjq9eARxMV4KUxH2+yTRG+Ufvnw5FZA2WqKpu3zNIZKXv6ZICcdL4IwK
+Oz99nayjDRcfHALK6lA1Z+Z0ghJ/3kwPPy5lmyDeQkl9nfRHpwgcbCJH08rOu/Bu
+2S5He8EHbAJc+VntbvKglGivYoDJ/EItXTtohfDSrZrptoNsGJRorfwLcM3deT2s
+3rmaKc5KSJRgeRE=
+-----END CERTIFICATE-----

@@ -10,6 +10,7 @@ import (
 	"github.com/gofrs/uuid"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 )
 
 var (
@@ -43,14 +44,14 @@ func checkPromise[T rohon.RHRiskData](result rohon.Result[T], caller string) (ro
 	return result, result.GetError()
 }
 
-type riskHub struct {
+type RiskHub struct {
 	UnimplementedRohonMonitorServer
 
 	apiCache      sync.Map
 	apiReqTimeout time.Duration
 }
 
-func (hub *riskHub) getApiInstance(idt string) (*riskApi, error) {
+func (hub *RiskHub) getApiInstance(idt string) (*riskApi, error) {
 	if api, exist := hub.apiCache.Load(idt); exist {
 		return api.(*riskApi), nil
 	}
@@ -61,7 +62,7 @@ func (hub *riskHub) getApiInstance(idt string) (*riskApi, error) {
 	)
 }
 
-func (hub *riskHub) Init(ctx context.Context, req *Request) (result *Result, err error) {
+func (hub *RiskHub) Init(ctx context.Context, req *Request) (result *Result, err error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -99,7 +100,7 @@ func (hub *riskHub) Init(ctx context.Context, req *Request) (result *Result, err
 	return
 }
 
-func (hub *riskHub) ReqUserLogin(ctx context.Context, req *Request) (result *Result, err error) {
+func (hub *RiskHub) ReqUserLogin(ctx context.Context, req *Request) (result *Result, err error) {
 	var api *riskApi
 	if api, err = hub.getApiInstance(req.GetApiIdentity()); err != nil {
 		return
@@ -148,7 +149,7 @@ func (hub *riskHub) ReqUserLogin(ctx context.Context, req *Request) (result *Res
 	return
 }
 
-func (hub *riskHub) ReqUserLogout(ctx context.Context, req *Request) (result *Result, err error) {
+func (hub *RiskHub) ReqUserLogout(ctx context.Context, req *Request) (result *Result, err error) {
 	var api *riskApi
 	if api, err = hub.getApiInstance(req.GetApiIdentity()); err != nil {
 		return
@@ -181,7 +182,7 @@ func (hub *riskHub) ReqUserLogout(ctx context.Context, req *Request) (result *Re
 	return
 }
 
-func (hub *riskHub) ReqQryMonitorAccounts(ctx context.Context, req *Request) (result *Result, err error) {
+func (hub *RiskHub) ReqQryMonitorAccounts(ctx context.Context, req *Request) (result *Result, err error) {
 	var api *riskApi
 	if api, err = hub.getApiInstance(req.GetApiIdentity()); err != nil {
 		return
@@ -219,26 +220,33 @@ func (hub *riskHub) ReqQryMonitorAccounts(ctx context.Context, req *Request) (re
 	return
 }
 
-func (hub *riskHub) ReqQryInvestorMoney(ctx context.Context, req *Request) (result *Result, err error) {
+func (hub *RiskHub) ReqQryInvestorMoney(ctx context.Context, req *Request) (result *Result, err error) {
 	var api *riskApi
 	if api, err = hub.getApiInstance(req.GetApiIdentity()); err != nil {
 		return
 	}
 
-	var investor *rohon.Investor
+	var promise rohon.Promise[rohon.Account]
+
 	if inv := req.GetInvestor(); inv != nil {
-		investor = &rohon.Investor{
+		investor := &rohon.Investor{
 			BrokerID:   inv.BrokerId,
 			InvestorID: inv.InvestorId,
 		}
-	}
 
-	var promise rohon.Promise[rohon.Account]
-	if promise, err = checkPromise(
-		api.ins.AsyncReqQryInvestorMoney(investor),
-		"ReqQryInvestorMoney",
-	); err != nil {
-		return
+		if promise, err = checkPromise(
+			api.ins.AsyncReqQryInvestorMoney(investor),
+			"ReqQryInvestorMoney",
+		); err != nil {
+			return
+		}
+	} else {
+		if promise, err = checkPromise(
+			api.ins.AsyncReqQryAllInvestorMoney(),
+			"ReqQryInvestorMoney",
+		); err != nil {
+			return
+		}
 	}
 
 	if err = promise.Then(func(r rohon.Result[rohon.Account]) error {
@@ -338,7 +346,11 @@ func (hub *riskHub) ReqQryInvestorMoney(ctx context.Context, req *Request) (resu
 }
 
 func NewRohonMonitorHub(svr *grpc.Server) RohonMonitorServer {
-	pb := &riskHub{}
+	pb := &RiskHub{}
+
 	RegisterRohonMonitorServer(svr, pb)
+
+	reflection.Register(svr)
+
 	return pb
 }
