@@ -13,9 +13,10 @@ const (
 
 type PrivilegeType uint8
 
+//go:generate stringer -type PrivilegeType -linecomment
 const (
-	RH_MONITOR_ADMINISTRATOR PrivilegeType = '0' + iota
-	RH_MONITOR_NOMAL
+	RH_MONITOR_ADMINISTRATOR PrivilegeType = '0' + iota // 管理员
+	RH_MONITOR_NOMAL                                    // 普通用户
 )
 
 type BusinessType uint8

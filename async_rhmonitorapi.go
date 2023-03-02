@@ -36,12 +36,13 @@ type Promise[T RHRiskData] interface {
 
 type PromiseStage uint8
 
+//go:generate stringer -type PromiseStage -linecomment
 const (
-	PromiseInfight PromiseStage = iota
-	PromiseAwait
-	PromiseThen
-	PromiseCatch
-	PromiseFinal
+	PromiseInfight PromiseStage = iota // Inflight
+	PromiseAwait                       // Await
+	PromiseThen                        // Then
+	PromiseCatch                       // Catch
+	PromiseFinal                       // Final
 )
 
 type ExecError struct {
@@ -60,7 +61,7 @@ type PromiseError struct {
 func (err *PromiseError) Error() string {
 	return errors.Wrapf(
 		err.err,
-		"error occoured in stage %d",
+		"error occoured in stage %s",
 		err.stage,
 	).Error()
 }
@@ -69,13 +70,13 @@ type Result[T RHRiskData] interface {
 	Promise[T]
 
 	IsBatch() bool
-	GetRequestID() int
+	GetRequestID() int64
 	GetExecCode() int
 	GetRspInfo() *RspInfo
 	GetError() error
 	GetData() <-chan *T
 
-	AppendResult(int, *T, bool)
+	AppendResult(int64, *T, bool)
 }
 
 type baseResult[T RHRiskData] struct {
@@ -111,41 +112,19 @@ func (r *baseResult[T]) waitAsyncData() {
 
 func (r *baseResult[T]) IsBatch() bool { return false }
 
-func (r *baseResult[T]) Then(fn CallbackFn[T]) Promise[T] {
-	r.successFn = fn
-
-	return r
-}
-
-func (r *baseResult[T]) Catch(fn CallbackFn[T]) Promise[T] {
-	r.failFn = fn
-
-	return r
-}
-
-func (r *baseResult[T]) Finally(fn CallbackFn[T]) Promise[T] {
-	r.finalFn = fn
-
-	return r
-}
-
-func (r *baseResult[T]) Await(context.Context, time.Duration) error {
-	return errors.New("await not implemented")
-}
-
 type BatchResult[T RHRiskData] struct {
 	baseResult[T]
 
-	requestIDList       []int
+	requestIDList       []int64
 	execCodeList        []int
 	promiseErrChainList [][]PromiseError
-	rspInfoCache        map[int]chan *RspInfo
-	rspStatusCache      map[int]bool
+	rspInfoCache        map[int64]chan *RspInfo
+	rspStatusCache      map[int64]bool
 }
 
 func (r *BatchResult[T]) IsBatch() bool { return true }
 
-func (r *BatchResult[T]) GetRequestID() int {
+func (r *BatchResult[T]) GetRequestID() int64 {
 	size := len(r.requestIDList)
 	if size == 0 {
 		return -1
@@ -165,7 +144,7 @@ func (r *BatchResult[T]) GetRspInfo() *RspInfo {
 	return nil
 }
 
-func (r *BatchResult[T]) AppendRequest(reqID, execCode int) {
+func (r *BatchResult[T]) AppendRequest(reqID int64, execCode int) {
 	r.requestIDList = append(r.requestIDList, reqID)
 	r.execCodeList = append(r.execCodeList, execCode)
 	r.promiseErrChainList = append(r.promiseErrChainList, []PromiseError{})
@@ -200,7 +179,7 @@ func (r *BatchResult[T]) GetError() (err error) {
 	return
 }
 
-func (r *BatchResult[T]) AppendResult(reqID int, v *T, isLast bool) {
+func (r *BatchResult[T]) AppendResult(reqID int64, v *T, isLast bool) {
 	if _, exist := r.rspInfoCache[reqID]; !exist {
 		log.Printf(
 			"Appended RequestID[%d] not exist in BatchResult", reqID,
@@ -225,6 +204,24 @@ func (r *BatchResult[T]) AppendResult(reqID int, v *T, isLast bool) {
 	}
 }
 
+func (r *BatchResult[T]) Then(fn CallbackFn[T]) Promise[T] {
+	r.successFn = fn
+
+	return r
+}
+
+func (r *BatchResult[T]) Catch(fn CallbackFn[T]) Promise[T] {
+	r.failFn = fn
+
+	return r
+}
+
+func (r *BatchResult[T]) Finally(fn CallbackFn[T]) Promise[T] {
+	r.finalFn = fn
+
+	return r
+}
+
 func (r *BatchResult[T]) Await(ctx context.Context, timeout time.Duration) error {
 	r.startOnce.Do(func() { close(r.startFlag) })
 
@@ -235,12 +232,12 @@ func (r *BatchResult[T]) Await(ctx context.Context, timeout time.Duration) error
 			continue
 		}
 
-		go func(idx, reqID int) {
+		go func(idx int, reqID int64) {
 			r.waitAsyncData()
 			defer r.finish.Done()
 
 			execCode := r.execCodeList[idx]
-			result := NewSingleResult[T](execCode, maxDataLen)
+			result := NewSingleResult[T](reqID, execCode)
 
 			if execCode != 0 {
 				r.promiseErrChainList[idx] = append(
@@ -324,8 +321,8 @@ func (r *BatchResult[T]) Await(ctx context.Context, timeout time.Duration) error
 
 func NewBatchResult[T RHRiskData]() *BatchResult[T] {
 	result := BatchResult[T]{
-		rspInfoCache:   make(map[int]chan *RspInfo),
-		rspStatusCache: make(map[int]bool),
+		rspInfoCache:   make(map[int64]chan *RspInfo),
+		rspStatusCache: make(map[int64]bool),
 	}
 	result.init()
 
@@ -333,16 +330,15 @@ func NewBatchResult[T RHRiskData]() *BatchResult[T] {
 }
 
 type SingleResult[T RHRiskData] struct {
-	baseResult[T]
-
 	promiseErrChain []PromiseError
+	requestID       int64
+	execCode        int
+	rspInfo         *RspInfo
 
-	requestID int
-	execCode  int
-	rspInfo   *RspInfo
+	baseResult[T]
 }
 
-func (r *SingleResult[T]) GetRequestID() int {
+func (r *SingleResult[T]) GetRequestID() int64 {
 	return r.requestID
 }
 
@@ -366,7 +362,7 @@ func (r *SingleResult[T]) GetError() (err error) {
 	return err
 }
 
-func (r *SingleResult[T]) AppendResult(reqID int, v *T, isLast bool) {
+func (r *SingleResult[T]) AppendResult(reqID int64, v *T, isLast bool) {
 	if reqID != r.requestID {
 		log.Printf(
 			"Appended RequestID[%d] miss match with Result[%d]",
@@ -383,6 +379,24 @@ func (r *SingleResult[T]) AppendResult(reqID int, v *T, isLast bool) {
 	if isLast {
 		close(r.data)
 	}
+}
+
+func (r *SingleResult[T]) Then(fn CallbackFn[T]) Promise[T] {
+	r.successFn = fn
+
+	return r
+}
+
+func (r *SingleResult[T]) Catch(fn CallbackFn[T]) Promise[T] {
+	r.failFn = fn
+
+	return r
+}
+
+func (r *SingleResult[T]) Finally(fn CallbackFn[T]) Promise[T] {
+	r.finalFn = fn
+
+	return r
 }
 
 func (r *SingleResult[T]) Await(ctx context.Context, timeout time.Duration) error {
@@ -471,17 +485,10 @@ func (r *SingleResult[T]) Await(ctx context.Context, timeout time.Duration) erro
 	return r.GetError()
 }
 
-func NewSingleResult[T RHRiskData](execCode int, dataLen int) *SingleResult[T] {
-	if dataLen < minDataLen {
-		dataLen = minDataLen
-	}
-
-	if dataLen > maxDataLen {
-		dataLen = maxDataLen
-	}
-
+func NewSingleResult[T RHRiskData](reqID int64, execCode int) *SingleResult[T] {
 	result := SingleResult[T]{
-		execCode: execCode,
+		requestID: reqID,
+		execCode:  execCode,
 	}
 
 	result.init()
@@ -516,7 +523,7 @@ func NewAsyncRHMonitorApi(brokerID, addr string, port int) *AsyncRHMonitorApi {
 func (api *AsyncRHMonitorApi) AsyncReqUserLogin(login *RiskUser) Result[RspUserLogin] {
 	reqID, rtn := api.ReqUserLogin(login)
 
-	result := NewSingleResult[RspUserLogin](rtn, 1)
+	result := NewSingleResult[RspUserLogin](reqID, rtn)
 
 	api.promiseCache.Store(reqID, result)
 
@@ -524,20 +531,22 @@ func (api *AsyncRHMonitorApi) AsyncReqUserLogin(login *RiskUser) Result[RspUserL
 }
 
 func (api *AsyncRHMonitorApi) OnRspUserLogin(login *RspUserLogin, info *RspInfo, reqID int) {
+	log.Printf("OnRspUserLogin triggered.")
+
 	api.RHMonitorApi.OnRspUserLogin(login, info, reqID)
 
-	if async, exist := api.promiseCache.LoadAndDelete(reqID); exist {
+	if async, exist := api.promiseCache.LoadAndDelete(int64(reqID)); exist {
 		result := async.(*SingleResult[RspUserLogin])
 
 		result.rspInfo = info
 
-		result.AppendResult(reqID, login, true)
+		result.AppendResult(int64(reqID), login, true)
 	}
 }
 
 func (api *AsyncRHMonitorApi) AsyncReqUserLogout() Result[RspUserLogout] {
 	reqID, rtn := api.ReqUserLogout()
-	result := NewSingleResult[RspUserLogout](rtn, 1)
+	result := NewSingleResult[RspUserLogout](reqID, rtn)
 
 	api.promiseCache.Store(reqID, result)
 
@@ -547,18 +556,19 @@ func (api *AsyncRHMonitorApi) AsyncReqUserLogout() Result[RspUserLogout] {
 func (api *AsyncRHMonitorApi) OnRspUserLogout(logout *RspUserLogout, info *RspInfo, reqID int) {
 	api.RHMonitorApi.OnRspUserLogout(logout, info, reqID)
 
-	if async, exist := api.promiseCache.LoadAndDelete(reqID); exist {
+	if async, exist := api.promiseCache.LoadAndDelete(int64(reqID)); exist {
 		result := async.(*SingleResult[RspUserLogout])
 
 		result.rspInfo = info
 
-		result.AppendResult(reqID, logout, true)
+		result.AppendResult(int64(reqID), logout, true)
 	}
 }
 
 func (api *AsyncRHMonitorApi) AsyncReqQryMonitorAccounts() Result[Investor] {
 	reqID, rtn := api.ReqQryMonitorAccounts()
-	result := NewSingleResult[Investor](rtn, maxDataLen)
+
+	result := NewSingleResult[Investor](reqID, rtn)
 
 	api.promiseCache.Store(reqID, result)
 
@@ -568,14 +578,14 @@ func (api *AsyncRHMonitorApi) AsyncReqQryMonitorAccounts() Result[Investor] {
 func (api *AsyncRHMonitorApi) OnRspQryMonitorAccounts(investor *Investor, info *RspInfo, reqID int, isLast bool) {
 	api.RHMonitorApi.OnRspQryMonitorAccounts(investor, info, reqID, isLast)
 
-	if promise, exist := api.promiseCache.Load(reqID); exist {
+	if promise, exist := api.promiseCache.Load(int64(reqID)); exist {
 		result := promise.(*SingleResult[Investor])
 
 		if result.rspInfo == nil {
 			result.rspInfo = info
 		}
 
-		result.AppendResult(reqID, investor, isLast)
+		result.AppendResult(int64(reqID), investor, isLast)
 
 		if isLast {
 			api.promiseCache.Delete(reqID)
@@ -585,7 +595,7 @@ func (api *AsyncRHMonitorApi) OnRspQryMonitorAccounts(investor *Investor, info *
 
 func (api *AsyncRHMonitorApi) AsyncReqQryInvestorMoney(investor *Investor) Result[Account] {
 	reqID, rtn := api.ReqQryInvestorMoney(investor)
-	result := NewSingleResult[Account](rtn, maxDataLen)
+	result := NewSingleResult[Account](reqID, rtn)
 
 	api.promiseCache.Store(reqID, result)
 
@@ -600,7 +610,7 @@ func (api *AsyncRHMonitorApi) AsyncReqQryAllInvestorMoney() Result[Account] {
 	api.investors.ForEach(func(s string, i *Investor) bool {
 		reqID, rtn := api.ExecReqQryInvestorMoney(i)
 
-		results.AppendRequest(int(reqID), rtn)
+		results.AppendRequest(reqID, rtn)
 
 		if rtn != 0 {
 			log.Printf("Query money for user[%s] failed: %d", i.InvestorID, rtn)
@@ -616,14 +626,14 @@ func (api *AsyncRHMonitorApi) AsyncReqQryAllInvestorMoney() Result[Account] {
 func (api *AsyncRHMonitorApi) OnRspQryInvestorMoney(acct *Account, info *RspInfo, reqID int, isLast bool) {
 	api.RHMonitorApi.OnRspQryInvestorMoney(acct, info, reqID, isLast)
 
-	if async, exist := api.promiseCache.Load(reqID); exist {
+	if async, exist := api.promiseCache.Load(int64(reqID)); exist {
 		result := async.(*SingleResult[Account])
 
 		if result.rspInfo == nil {
 			result.rspInfo = info
 		}
 
-		result.AppendResult(reqID, acct, isLast)
+		result.AppendResult(int64(reqID), acct, isLast)
 
 		if isLast {
 			api.promiseCache.Delete(reqID)
@@ -633,7 +643,7 @@ func (api *AsyncRHMonitorApi) OnRspQryInvestorMoney(acct *Account, info *RspInfo
 
 func (api *AsyncRHMonitorApi) AsyncReqQryInvestorPosition(investor *Investor, instrument string) Result[Position] {
 	reqID, rtn := api.ReqQryInvestorPosition(investor, instrument)
-	result := NewSingleResult[Position](rtn, maxDataLen)
+	result := NewSingleResult[Position](reqID, rtn)
 
 	api.promiseCache.Store(reqID, result)
 
@@ -643,14 +653,14 @@ func (api *AsyncRHMonitorApi) AsyncReqQryInvestorPosition(investor *Investor, in
 func (api *AsyncRHMonitorApi) OnRspQryInvestorPosition(pos *Position, info *RspInfo, reqID int, isLast bool) {
 	api.RHMonitorApi.OnRspQryInvestorPosition(pos, info, reqID, isLast)
 
-	if async, exist := api.promiseCache.Load(reqID); exist {
+	if async, exist := api.promiseCache.Load(int64(reqID)); exist {
 		result := async.(*SingleResult[Position])
 
 		if result.rspInfo == nil {
 			result.rspInfo = info
 		}
 
-		result.AppendResult(reqID, pos, isLast)
+		result.AppendResult(int64(reqID), pos, isLast)
 
 		if isLast {
 			api.promiseCache.Delete(reqID)
@@ -660,7 +670,7 @@ func (api *AsyncRHMonitorApi) OnRspQryInvestorPosition(pos *Position, info *RspI
 
 func (api *AsyncRHMonitorApi) AsyncReqOffsetOrder(offset *OffsetOrder) Result[OffsetOrder] {
 	reqID, rtn := api.ReqOffsetOrder(offset)
-	result := NewSingleResult[OffsetOrder](rtn, maxDataLen)
+	result := NewSingleResult[OffsetOrder](reqID, rtn)
 
 	api.promiseCache.Store(reqID, result)
 
@@ -670,14 +680,14 @@ func (api *AsyncRHMonitorApi) AsyncReqOffsetOrder(offset *OffsetOrder) Result[Of
 func (api *AsyncRHMonitorApi) OnRspOffsetOrder(offset *OffsetOrder, info *RspInfo, reqID int, isLast bool) {
 	api.RHMonitorApi.OnRspOffsetOrder(offset, info, reqID, isLast)
 
-	if async, exist := api.promiseCache.Load(reqID); exist {
+	if async, exist := api.promiseCache.Load(int64(reqID)); exist {
 		result := async.(*SingleResult[OffsetOrder])
 
 		if result.rspInfo == nil {
 			result.rspInfo = info
 		}
 
-		result.AppendResult(reqID, offset, isLast)
+		result.AppendResult(int64(reqID), offset, isLast)
 
 		if isLast {
 			api.promiseCache.Delete(reqID)
