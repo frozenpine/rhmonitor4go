@@ -24,6 +24,7 @@ func init() {
 	log.SetFlags(log.Flags() | log.Lmicroseconds)
 }
 
+// overwrite default api callback functions
 type myApi struct {
 	rohon.RHMonitorApi
 }
@@ -35,15 +36,12 @@ func (api *myApi) OnFrontConnected() {
 
 func main() {
 	api := &myApi{}
-	// api := &rohon.RHMonitorApi{}
 
 	log.Printf("Instance: %p", api)
 
-	api.Init(brokerID, remoteAddr, remotePort, api)
-
-	// if api == nil {
-	// 	log.Fatal("Create api instance failed.")
-	// }
+	if err := api.Init(brokerID, remoteAddr, remotePort, api); err != nil {
+		log.Fatalf("Risk api init failed: +%v", err)
+	}
 
 	ctx := context.Background()
 	signal.NotifyContext(ctx, os.Interrupt, os.Kill)
