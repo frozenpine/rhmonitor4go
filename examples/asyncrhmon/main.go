@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -59,7 +60,18 @@ func main() {
 			return nil
 		},
 	).Await(ctx, timeout); err != nil {
-		log.Fatalf("ReqUserLogin failed: %+v", err)
+		log.Fatalf("AsyncReqUserLogin failed: %+v", err)
+	}
+
+	if err = api.AsyncReqQryMonitorAccounts().Then(
+		func(r rohon.Result[rohon.Investor]) error {
+			for inv := range r.GetData() {
+				fmt.Printf("AsyncOnRspQryMonitorAccounts: %+v", inv)
+			}
+			return nil
+		},
+	).Await(ctx, timeout); err != nil {
+		log.Fatalf("AyncReqQryMonitorAccounts failed: %+v", err)
 	}
 
 	<-ctx.Done()

@@ -96,7 +96,7 @@ func (usr RiskUser) ToCRHMonitorQryMonitorUser() *C.struct_CRHMonitorQryMonitorU
 type RspUserLogin struct {
 	UserID            string
 	PrivilegeType     PrivilegeType
-	InfoPrivilegeType string
+	InfoPrivilegeType InfoPrivilegeType
 	TradingDay        string
 	LoginTime         string
 }
@@ -106,13 +106,16 @@ func NewFromCRHMonitorRspUserLoginField(pRspUserLoginField *C.struct_CRHMonitorR
 		return nil
 	}
 
-	return &RspUserLogin{
-		UserID:            CStr2GoStr(unsafe.Pointer(&pRspUserLoginField.UserID)),
-		PrivilegeType:     PrivilegeType(pRspUserLoginField.PrivilegeType),
-		InfoPrivilegeType: CStr2GoStr(unsafe.Pointer(&pRspUserLoginField.InfoPrivilegeType)),
-		TradingDay:        CStr2GoStr(unsafe.Pointer(&pRspUserLoginField.TradingDay)),
-		LoginTime:         CStr2GoStr(unsafe.Pointer(&pRspUserLoginField.LoginTime)),
+	login := RspUserLogin{
+		UserID:        CStr2GoStr(unsafe.Pointer(&pRspUserLoginField.UserID)),
+		PrivilegeType: PrivilegeType(pRspUserLoginField.PrivilegeType),
+		TradingDay:    CStr2GoStr(unsafe.Pointer(&pRspUserLoginField.TradingDay)),
+		LoginTime:     CStr2GoStr(unsafe.Pointer(&pRspUserLoginField.LoginTime)),
 	}
+
+	CopyN(login.InfoPrivilegeType[:], unsafe.Pointer(&pRspUserLoginField.InfoPrivilegeType), 200)
+
+	return &login
 }
 
 type RspUserLogout struct {

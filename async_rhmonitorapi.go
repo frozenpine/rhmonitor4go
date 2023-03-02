@@ -531,8 +531,6 @@ func (api *AsyncRHMonitorApi) AsyncReqUserLogin(login *RiskUser) Result[RspUserL
 }
 
 func (api *AsyncRHMonitorApi) OnRspUserLogin(login *RspUserLogin, info *RspInfo, reqID int) {
-	log.Printf("OnRspUserLogin triggered.")
-
 	api.RHMonitorApi.OnRspUserLogin(login, info, reqID)
 
 	if async, exist := api.promiseCache.LoadAndDelete(int64(reqID)); exist {
