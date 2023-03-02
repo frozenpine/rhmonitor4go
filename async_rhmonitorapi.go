@@ -40,6 +40,14 @@ const (
 	PromiseFinal                       // Final
 )
 
+const (
+	InfinitResultReq int64 = -1
+)
+
+var (
+	ErrRspChanMissing = errors.New("response chan missing")
+)
+
 type ExecError struct {
 	exec_code int
 }
@@ -72,6 +80,7 @@ type Result[T RHRiskData] interface {
 	GetData() <-chan *T
 
 	AppendResult(int64, *T, bool)
+	SetRspInfo(int64, *RspInfo)
 }
 
 type baseResult[T RHRiskData] struct {
@@ -143,11 +152,11 @@ func (r *baseResult[T]) Finally(fn CallbackFn[T]) Promise[T] {
 type BatchResult[T RHRiskData] struct {
 	baseResult[T]
 
-	requestIDList       []int64
-	execCodeList        []int
-	promiseErrChainList [][]PromiseError
-	rspInfoCache        map[int64]chan *RspInfo
-	rspStatusCache      map[int64]bool
+	requestIDList        []int64
+	execCodeList         []int
+	promiseErrChainList  [][]PromiseError
+	rspInfoCache         map[int64]chan *RspInfo
+	rspNotifyStatusCache map[int64]bool
 }
 
 func (r *BatchResult[T]) IsBatch() bool { return true }
@@ -179,7 +188,7 @@ func (r *BatchResult[T]) AppendRequest(reqID int64, execCode int) {
 
 	if execCode == 0 {
 		r.rspInfoCache[reqID] = make(chan *RspInfo)
-		r.rspStatusCache[reqID] = false
+		r.rspNotifyStatusCache[reqID] = false
 	}
 }
 
@@ -207,6 +216,18 @@ func (r *BatchResult[T]) GetError() (err error) {
 	return
 }
 
+func (r *BatchResult[T]) SetRspInfo(reqID int64, rsp *RspInfo) {
+	if rsp == nil {
+		return
+	}
+
+	if rspCh, exist := r.rspInfoCache[reqID]; exist {
+		rspCh <- rsp
+	}
+
+	r.rspNotifyStatusCache[reqID] = true
+}
+
 func (r *BatchResult[T]) AppendResult(reqID int64, v *T, isLast bool) {
 	if _, exist := r.rspInfoCache[reqID]; !exist {
 		log.Printf(
@@ -220,10 +241,10 @@ func (r *BatchResult[T]) AppendResult(reqID int64, v *T, isLast bool) {
 
 	r.data <- v
 
-	r.rspStatusCache[reqID] = isLast
+	r.rspNotifyStatusCache[reqID] = isLast
 
 	all := true
-	for _, v := range r.rspStatusCache {
+	for _, v := range r.rspNotifyStatusCache {
 		all = all && v
 	}
 
@@ -331,8 +352,8 @@ func (r *BatchResult[T]) Await(ctx context.Context, timeout time.Duration) error
 
 func NewBatchResult[T RHRiskData]() *BatchResult[T] {
 	result := BatchResult[T]{
-		rspInfoCache:   make(map[int64]chan *RspInfo),
-		rspStatusCache: make(map[int64]bool),
+		rspInfoCache:         make(map[int64]chan *RspInfo),
+		rspNotifyStatusCache: make(map[int64]bool),
 	}
 	result.init(&result)
 
@@ -389,6 +410,10 @@ func (r *SingleResult[T]) AppendResult(reqID int64, v *T, isLast bool) {
 	if isLast {
 		close(r.data)
 	}
+}
+
+func (r *SingleResult[T]) SetRspInfo(_ int64, rsp *RspInfo) {
+	r.rspInfo = rsp
 }
 
 func (r *SingleResult[T]) Await(ctx context.Context, timeout time.Duration) error {
@@ -499,6 +524,8 @@ type AsyncRHMonitorApi struct {
 	promiseCache sync.Map
 	orderFlow    Result[Order]
 	tradeFlow    Result[Trade]
+	accountFlow  Result[Account]
+	positionFlow Result[Position]
 }
 
 func NewAsyncRHMonitorApi(brokerID, addr string, port int) *AsyncRHMonitorApi {
@@ -526,9 +553,9 @@ func (api *AsyncRHMonitorApi) OnRspUserLogin(login *RspUserLogin, info *RspInfo,
 	api.RHMonitorApi.OnRspUserLogin(login, info, reqID)
 
 	if async, exist := api.promiseCache.LoadAndDelete(reqID); exist {
-		result := async.(*SingleResult[RspUserLogin])
+		result := async.(Result[RspUserLogin])
 
-		result.rspInfo = info
+		result.SetRspInfo(reqID, info)
 
 		result.AppendResult(reqID, login, true)
 	}
@@ -547,9 +574,9 @@ func (api *AsyncRHMonitorApi) OnRspUserLogout(logout *RspUserLogout, info *RspIn
 	api.RHMonitorApi.OnRspUserLogout(logout, info, reqID)
 
 	if async, exist := api.promiseCache.LoadAndDelete(reqID); exist {
-		result := async.(*SingleResult[RspUserLogout])
+		result := async.(Result[RspUserLogout])
 
-		result.rspInfo = info
+		result.SetRspInfo(reqID, info)
 
 		result.AppendResult(reqID, logout, true)
 	}
@@ -569,11 +596,9 @@ func (api *AsyncRHMonitorApi) OnRspQryMonitorAccounts(investor *Investor, info *
 	api.RHMonitorApi.OnRspQryMonitorAccounts(investor, info, reqID, isLast)
 
 	if promise, exist := api.promiseCache.Load(reqID); exist {
-		result := promise.(*SingleResult[Investor])
+		result := promise.(Result[Investor])
 
-		if result.rspInfo == nil {
-			result.rspInfo = info
-		}
+		result.SetRspInfo(reqID, info)
 
 		result.AppendResult(reqID, investor, isLast)
 
@@ -617,11 +642,9 @@ func (api *AsyncRHMonitorApi) OnRspQryInvestorMoney(acct *Account, info *RspInfo
 	api.RHMonitorApi.OnRspQryInvestorMoney(acct, info, reqID, isLast)
 
 	if async, exist := api.promiseCache.Load(reqID); exist {
-		result := async.(*SingleResult[Account])
+		result := async.(Result[Account])
 
-		if result.rspInfo == nil {
-			result.rspInfo = info
-		}
+		result.SetRspInfo(reqID, info)
 
 		result.AppendResult(reqID, acct, isLast)
 
@@ -644,11 +667,9 @@ func (api *AsyncRHMonitorApi) OnRspQryInvestorPosition(pos *Position, info *RspI
 	api.RHMonitorApi.OnRspQryInvestorPosition(pos, info, reqID, isLast)
 
 	if async, exist := api.promiseCache.Load(reqID); exist {
-		result := async.(*SingleResult[Position])
+		result := async.(Result[Position])
 
-		if result.rspInfo == nil {
-			result.rspInfo = info
-		}
+		result.SetRspInfo(reqID, info)
 
 		result.AppendResult(reqID, pos, isLast)
 
@@ -671,11 +692,9 @@ func (api *AsyncRHMonitorApi) OnRspOffsetOrder(offset *OffsetOrder, info *RspInf
 	api.RHMonitorApi.OnRspOffsetOrder(offset, info, reqID, isLast)
 
 	if async, exist := api.promiseCache.Load(reqID); exist {
-		result := async.(*SingleResult[OffsetOrder])
+		result := async.(Result[OffsetOrder])
 
-		if result.rspInfo == nil {
-			result.rspInfo = info
-		}
+		result.SetRspInfo(reqID, info)
 
 		result.AppendResult(reqID, offset, isLast)
 
@@ -685,16 +704,14 @@ func (api *AsyncRHMonitorApi) OnRspOffsetOrder(offset *OffsetOrder, info *RspInf
 	}
 }
 
-// func (api *AsyncRHMonitorApi) AsyncReqSubInvestorOrder(investor *Investor) Result[Order] {
-// 	_, rtn := api.ReqSubInvestorOrder(investor)
+func (api *AsyncRHMonitorApi) AsyncReqSubInvestorOrder(investor *Investor) Result[Order] {
+	if api.orderFlow == nil || api.orderFlow.GetExecCode() != 0 {
+		_, rtn := api.ReqSubInvestorOrder(investor)
+		api.orderFlow = NewSingleResult[Order](InfinitResultReq, rtn)
+	}
 
-// 	atomic.CompareAndSwapPointer(
-// 		(*unsafe.Pointer)(unsafe.Pointer(api.orderFlow)),
-// 		nil, unsafe.Pointer(NewSingleResult[Order](rtn, maxDataLen)),
-// 	)
-
-// 	return api.orderFlow
-// }
+	return api.orderFlow
+}
 
 func (api *AsyncRHMonitorApi) OnRtnOrder(order *Order) {
 	api.RHMonitorApi.OnRtnOrder(order)
@@ -704,35 +721,36 @@ func (api *AsyncRHMonitorApi) OnRtnOrder(order *Order) {
 	}
 }
 
-// func (api *AsyncRHMonitorApi) AsyncReqSubInvestorTrade(investor *Investor) *SingleResult[Trade] {
-// 	_, rtn := api.ReqSubInvestorTrade(investor)
+func (api *AsyncRHMonitorApi) AsyncReqSubInvestorTrade(investor *Investor) Result[Trade] {
+	if api.tradeFlow == nil || api.tradeFlow.GetExecCode() != 0 {
+		_, rtn := api.ReqSubInvestorTrade(investor)
+		api.tradeFlow = NewSingleResult[Trade](InfinitResultReq, rtn)
+	}
 
-// 	atomic.CompareAndSwapPointer(
-// 		(*unsafe.Pointer)(unsafe.Pointer(&api.tradeFlow)),
-// 		nil, unsafe.Pointer(NewSingleResult[Trade](rtn, maxDataLen)),
-// 	)
-
-// 	return api.tradeFlow
-// }
+	return api.tradeFlow
+}
 
 func (api *AsyncRHMonitorApi) OnRtnTrade(trade *Trade) {
 	api.RHMonitorApi.OnRtnTrade(trade)
 
 	if api.tradeFlow != nil {
-		api.tradeFlow.AppendResult(-1, trade, false)
+		api.tradeFlow.AppendResult(InfinitResultReq, trade, false)
 	}
 }
 
+// TODO: 查找持仓和资金的回报从哪个订阅回来，且需要重新考虑无限流中Await的逻辑
 func (api *AsyncRHMonitorApi) OnRtnInvestorMoney(account *Account) {
 	api.RHMonitorApi.OnRtnInvestorMoney(account)
 
-	// api.accountChan.Publish("", *account)
+	if api.accountFlow != nil {
+		api.accountFlow.AppendResult(InfinitResultReq, account, false)
+	}
 }
 
 func (api *AsyncRHMonitorApi) OnRtnInvestorPosition(position *Position) {
 	api.RHMonitorApi.OnRtnInvestorPosition(position)
 
-	// if api.positionFlow != nil {
-	// 	api.positionFlow.AppendResult(position, false)
-	// }
+	if api.positionFlow != nil {
+		api.positionFlow.AppendResult(InfinitResultReq, position, false)
+	}
 }

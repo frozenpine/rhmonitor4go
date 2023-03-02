@@ -83,15 +83,13 @@ void cgoOnRtnInvestorPosition
 import "C"
 
 import (
-	origin_error "errors"
-
 	"github.com/pkg/errors"
 )
 
 var (
 	spiCache = make(map[C.CRHMonitorInstance]RHRiskSpi)
 
-	ErrInstanceNotExist = origin_error.New("spi instance not found")
+	ErrInstanceNotExist = errors.New("spi instance not found")
 
 	callbacks = C.callback_t{
 		cOnFrontConnected:         C.CbOnFrontConnected(C.cgoOnFrontConnected),
