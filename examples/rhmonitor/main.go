@@ -36,6 +36,10 @@ func (api *myApi) OnFrontConnected() {
 	log.Println("MyApi OnFrontConnected called.")
 }
 
+func (api *myApi) OnRspQryInvestorMoney(acct *rohon.Account, info *rohon.RspInfo, reqID int64, isLast bool) {
+	log.Println(acct, info, reqID, isLast)
+}
+
 func main() {
 	api := &myApi{}
 
