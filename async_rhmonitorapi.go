@@ -208,13 +208,13 @@ func (r *BatchResult[T]) AppendRequest(reqID int64, execCode int) {
 }
 
 func (r *BatchResult[T]) GetExecCode() int {
-	size := len(r.requestIDList)
+	rtn := 0
 
-	if size <= 0 {
-		return 255
+	for _, code := range r.execCodeList {
+		rtn += code
 	}
 
-	return r.execCodeList[size-1]
+	return rtn
 }
 
 func (r *BatchResult[T]) GetError() (err error) {
@@ -269,13 +269,9 @@ func (r *BatchResult[T]) AppendResult(reqID int64, v *T, isLast bool) {
 }
 
 func (r *BatchResult[T]) Await(ctx context.Context, timeout time.Duration) error {
-	r.finish.Add(len(r.rspCache))
+	r.finish.Add(len(r.requestIDList))
 
 	for idx, reqID := range r.requestIDList {
-		if r.execCodeList[idx] != 0 {
-			continue
-		}
-
 		go func(idx int, reqID int64) {
 			r.waitRsp(reqID)
 
