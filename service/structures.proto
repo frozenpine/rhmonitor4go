@@ -123,7 +123,7 @@ enum OrderPriceType {
   gtc_limit = 18;
   stock_lend = 19;
   stock_financing_buy = 20;
-  repay_stock = 21;
+  repay_stock_type = 21;
   etf_purchase = 22;
   etf_redemption = 23;
 }
@@ -232,6 +232,157 @@ message SubInfo {
   SubInfoType sub_info_type = 3;
 }
 
+enum TimeCondition {
+  immediate_or_cancel = 0;
+  good_for_section = 1;
+  good_for_day = 2;
+  good_till_date = 3;
+  good_till_canceled = 4;
+  good_for_auction = 5;
+}
+
+enum VolumeCondition {
+  any_volume = 0;
+  min_volume = 1;
+  all_volume = 2;
+}
+
+enum ContingentCondition {
+  immediately = 0;
+  touch = 1;
+  touch_profit = 2;
+  parked_order = 3;
+  last_price_greate_than_stop_price = 4;
+  last_price_greate_equal_stop_price = 5;
+  last_price_less_than_stop_price = 6;
+  last_price_less_equal_stop_price = 7;
+  ask_price_greate_than_stop_price = 8;
+}
+
+enum ForceCloseReason {
+  not_force_close = 0;
+  lack_deposit = 1;
+  client_over_position_limit = 2;
+  member_over_position_limit = 3;
+  not_multiple = 4;
+  violation = 5;
+  other = 6;
+  person_deliv = 7;
+}
+
+enum OrderSubmitStatus {
+  insert_submitted = 0;
+  cancel_submitted = 1;
+  modify_submitted = 2;
+  accepted = 3;
+  insert_rejected = 4;
+  cancel_rejected = 5;
+  modify_rejected = 6;
+}
+
+enum OrderSource {
+  participant = 0;
+  administrator = 1;
+  query_order = 2;
+  monitor_force_order = 3;
+  risk_force_order = 4;
+  monitor_third_order = 5;
+  real_obj_third_order = 6;
+  server_condition_order = 7;
+  server_loss_order = 8;
+  server_profit_order = 9;
+}
+
+enum OrderStatus {
+  all_traded = 0;
+  part_traded_queueing = 1;
+  part_traded_not_queueing = 2;
+  no_trade_queueing = 3;
+  no_trade_not_queueing = 4;
+  canceled = 5;
+  unknown = 6;
+  not_touched = 7;
+  touched = 8;
+  submitted = 9;
+  amending = 10;
+}
+
+enum OrderType {
+  normal = 0;
+  derive_from_quote = 1;
+  derive_from_combination = 2;
+  combination = 3;
+  conditional_order = 4;
+  swap = 5;
+  financing_buy = 6;
+  sell_repay_money = 7;
+  finacing_sell = 8;
+  repay_stock = 9;
+}
+
+message Order {
+  Investor investor = 1;
+  string instrument_id = 2;
+  string order_ref = 3;
+  OrderPriceType price_type = 4;
+  Direction direction = 5;
+
+  double limit_price = 8;
+  int32 volume_total_origin = 9;
+  TimeCondition time_condition = 10;
+  string gtd_date = 11;
+  VolumeCondition volume_condition = 12;
+  int32 min_volume = 13;
+  ContingentCondition contingent_condition = 14;
+  double stop_price = 15;
+  ForceCloseReason force_close_reason = 17;
+  bool is_auto_suspend = 18;
+  string business_unit = 19;
+  int64 request_id = 20;
+  string order_local_id = 21;
+  string exchange_id = 22;
+  string participant_id = 23;
+  string client_id = 24;
+  string exchange_instrument_id = 25;
+  string trader_id = 26;
+  int32 install_id = 27;
+  OrderSubmitStatus order_submit_status = 28;
+  int32 notify_sequence = 29;
+  string trading_day = 30;
+  int32 settlement_id = 31;
+  string order_sys_id = 32;
+  OrderSource order_source = 33;
+  OrderStatus order_status = 34;
+  OrderType order_type = 35;
+  int32 volume_traded = 36;
+  int32 volume_total = 37;
+  string insert_date = 38;
+  string insert_time = 39;
+  string active_time = 40;
+  string suspend_time = 41;
+  string update_time = 42;
+  string cancel_time = 43;
+  string active_trader_id = 44;
+  string clearing_part_id = 45;
+  int32 sequence_no = 46;
+  int32 front_id = 47;
+  int32 session_id = 48;
+  string user_product_info = 49;
+  string status_message = 50;
+  bool user_force_close = 51;
+  string active_user_id = 52;
+  int32 broker_order_sequence = 53;
+  string relative_order_sys_id = 54;
+  int32 zce_total_traded_volume = 55;
+  bool is_swap_order = 56;
+  string branch_id = 57;
+  string invest_unit_id = 58;
+  string account_id = 59;
+  CurrencyID currency_id = 60;
+  string ip_address = 61;
+  string mac_address = 62;
+}
+
 message RiskUser {
   string user_id = 1;
   string password = 2;
@@ -240,7 +391,7 @@ message RiskUser {
 
 enum PrivilegeType {
   admin = 0;
-  normal = 1;
+  user = 1;
 }
 
 message RspUserLogin {

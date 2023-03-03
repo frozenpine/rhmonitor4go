@@ -43,6 +43,8 @@ service RohonMonitor {
   rpc ReqQryMonitorAccounts(Request) returns (Result) {}
   rpc ReqQryInvestorMoney(Request) returns (Result) {}
   rpc ReqQryInvestorPosition(Request) returns (Result) {}
+  rpc SubInvestorOrder(Request) returns (stream Order) {}
+  rpc SubInvestorTrade(Request) returns (stream Trade) {}
   rpc SubInvestorMoney(Request) returns (stream Account) {}
   rpc SubInvestorPosition(Request) returns (stream Position) {}
 }

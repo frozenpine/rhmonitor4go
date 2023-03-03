@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	origin_err "errors"
 	"sync"
 	"time"
 
@@ -14,9 +13,9 @@ import (
 )
 
 var (
-	ErrInvalidArgs     = origin_err.New("invalid request args")
-	ErrRiskApiNotFound = origin_err.New("risk api not found")
-	ErrRequestFailed   = origin_err.New("request execution failed")
+	ErrInvalidArgs     = errors.New("invalid request args")
+	ErrRiskApiNotFound = errors.New("risk api not found")
+	ErrRequestFailed   = errors.New("request execution failed")
 )
 
 type riskApi struct {
@@ -127,7 +126,7 @@ func (hub *RiskHub) ReqUserLogin(ctx context.Context, req *Request) (result *Res
 		case rohon.RH_MONITOR_ADMINISTRATOR:
 			pri_type = admin
 		case rohon.RH_MONITOR_NOMAL:
-			pri_type = normal
+			pri_type = user
 		}
 
 		result.Response = &Result_UserLogin{
