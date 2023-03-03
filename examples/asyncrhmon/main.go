@@ -66,12 +66,28 @@ func main() {
 	if err = api.AsyncReqQryMonitorAccounts().Then(
 		func(r rohon.Result[rohon.Investor]) error {
 			for inv := range r.GetData() {
-				fmt.Printf("AsyncOnRspQryMonitorAccounts: %+v", inv)
+				fmt.Printf("AsyncOnRspQryMonitorAccounts: %+v\n", inv)
 			}
 			return nil
 		},
 	).Await(ctx, timeout); err != nil {
 		log.Fatalf("AyncReqQryMonitorAccounts failed: %+v", err)
+	}
+
+	if err = api.AsyncReqQryAllInvestorMoney().Await(ctx, timeout); err != nil {
+		log.Fatalf("AsyncReqQryAllInvestorMoney failed: %+v", err)
+	}
+
+	if err = api.AsyncReqSubAllInvestorMoney().Then(
+		func(r rohon.Result[rohon.Account]) error {
+			for acct := range r.GetData() {
+				fmt.Printf("AsyncOnRtnInvestorMoney: %+v\n", acct)
+			}
+
+			return nil
+		},
+	).Await(ctx, timeout); err != nil {
+		log.Fatalf("AsyncReqSubAllInvestorMoney failed: %+v\n", err)
 	}
 
 	<-ctx.Done()
