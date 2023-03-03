@@ -68,17 +68,17 @@ func main() {
 		log.Fatalf("ReqQryAllInvestorMoney failed: %d", rtn)
 	}
 
-	if rtn = api.ReqQryAllInvestorPosition(); rtn != 0 {
-		log.Fatalf("ReqQryAllInvestorPosition failed: %d", rtn)
-	}
+	// if rtn = api.ReqQryAllInvestorPosition(); rtn != 0 {
+	// 	log.Fatalf("ReqQryAllInvestorPosition failed: %d", rtn)
+	// }
 
-	if rtn = api.ReqSubAllInvestorOrder(); rtn != 0 {
-		log.Fatalf("ReqSubAllInvestorOrder failed: %d", rtn)
-	}
+	// if rtn = api.ReqSubAllInvestorOrder(); rtn != 0 {
+	// 	log.Fatalf("ReqSubAllInvestorOrder failed: %d", rtn)
+	// }
 
-	if rtn = api.ReqSubAllInvestorTrade(); rtn != 0 {
-		log.Fatalf("ReqSubAllInvestorTrade failed: %d", rtn)
-	}
+	// if rtn = api.ReqSubAllInvestorTrade(); rtn != 0 {
+	// 	log.Fatalf("ReqSubAllInvestorTrade failed: %d", rtn)
+	// }
 
 	<-ctx.Done()
 }

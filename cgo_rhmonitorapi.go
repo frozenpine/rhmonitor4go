@@ -459,6 +459,7 @@ func (api *RHMonitorApi) OnRtnTrade(trade *Trade) {
 	printData("OnRtnTrade", trade)
 }
 
+// 不进行任何订阅，在进行用户资金查询或其他任何会影响资金变动的操作后，都会推送
 func (api *RHMonitorApi) OnRtnInvestorMoney(account *Account) {
 	printData("OnRtnInvestorMoney", account)
 }

@@ -42,6 +42,10 @@ const (
 
 const (
 	InfinitResultReq int64 = -1
+	orderFlow              = "order"
+	tradeFlow              = "trade"
+	accountFlow            = "account"
+	positionFlow           = "position"
 )
 
 var (
@@ -416,86 +420,88 @@ func (r *SingleResult[T]) SetRspInfo(_ int64, rsp *RspInfo) {
 	r.rspInfo = rsp
 }
 
+func (r *SingleResult[T]) awaitLoop() {
+	r.waitAsyncData()
+
+	defer r.finish.Done()
+
+	if r.execCode != 0 {
+		r.promiseErrChain = append(
+			r.promiseErrChain,
+			PromiseError{
+				stage: PromiseInfight,
+				err:   &ExecError{exec_code: r.execCode},
+			},
+		)
+
+		goto CATCH
+	}
+
+	if r.rspInfo == nil || r.rspInfo.ErrorID == 0 {
+		goto THEN
+	} else {
+		r.promiseErrChain = append(
+			r.promiseErrChain,
+			PromiseError{
+				stage: PromiseAwait,
+				err:   r.rspInfo,
+			},
+		)
+		goto CATCH
+	}
+
+THEN:
+	if r.successFn != nil {
+		if err := r.successFn(r); err != nil {
+			r.promiseErrChain = append(
+				r.promiseErrChain,
+				PromiseError{
+					stage: PromiseThen,
+					err:   err,
+				},
+			)
+
+			goto CATCH
+		}
+	}
+
+	goto FINAL
+
+CATCH:
+	if r.failFn != nil {
+		if err := r.failFn(r); err != nil {
+			r.promiseErrChain = append(
+				r.promiseErrChain,
+				PromiseError{
+					stage: PromiseCatch,
+					err:   err,
+				},
+			)
+		}
+	}
+
+	goto FINAL
+
+FINAL:
+	if r.finalFn != nil {
+		if err := r.finalFn(r); err != nil {
+			r.promiseErrChain = append(
+				r.promiseErrChain,
+				PromiseError{
+					stage: PromiseFinal,
+					err:   err,
+				},
+			)
+		}
+	}
+}
+
 func (r *SingleResult[T]) Await(ctx context.Context, timeout time.Duration) error {
 	r.finish.Add(1)
 
 	r.startOnce.Do(func() { close(r.startFlag) })
 
-	go func() {
-		r.waitAsyncData()
-
-		defer r.finish.Done()
-
-		if r.execCode != 0 {
-			r.promiseErrChain = append(
-				r.promiseErrChain,
-				PromiseError{
-					stage: PromiseInfight,
-					err:   &ExecError{exec_code: r.execCode},
-				},
-			)
-
-			goto CATCH
-		}
-
-		if r.rspInfo == nil || r.rspInfo.ErrorID == 0 {
-			goto THEN
-		} else {
-			r.promiseErrChain = append(
-				r.promiseErrChain,
-				PromiseError{
-					stage: PromiseAwait,
-					err:   r.rspInfo,
-				},
-			)
-			goto CATCH
-		}
-
-	THEN:
-		if r.successFn != nil {
-			if err := r.successFn(r); err != nil {
-				r.promiseErrChain = append(
-					r.promiseErrChain,
-					PromiseError{
-						stage: PromiseThen,
-						err:   err,
-					},
-				)
-
-				goto CATCH
-			}
-		}
-
-		goto FINAL
-
-	CATCH:
-		if r.failFn != nil {
-			if err := r.failFn(r); err != nil {
-				r.promiseErrChain = append(
-					r.promiseErrChain,
-					PromiseError{
-						stage: PromiseCatch,
-						err:   err,
-					},
-				)
-			}
-		}
-
-		goto FINAL
-
-	FINAL:
-		if r.finalFn != nil {
-			if err := r.finalFn(r); err != nil {
-				r.promiseErrChain = append(
-					r.promiseErrChain,
-					PromiseError{
-						stage: PromiseFinal,
-						err:   err,
-					},
-				)
-			}
-		}
-	}()
+	go r.awaitLoop()
 
 	r.finish.Wait()
 
@@ -518,14 +524,46 @@ func NewSingleResult[T RHRiskData](reqID int64, execCode int) *SingleResult[T] {
 	return &result
 }
 
+type FlowResult[T RHRiskData] struct {
+	SingleResult[T]
+}
+
+func (r *FlowResult[T]) Await(ctx context.Context, timeout time.Duration) error {
+	go r.awaitLoop()
+
+	if r.GetExecCode() != 0 {
+		r.finish.Wait()
+	}
+
+	return r.GetError()
+}
+
+func NewFlowResult[T RHRiskData](execCode int) *FlowResult[T] {
+	result := FlowResult[T]{
+		SingleResult[T]{
+			requestID: InfinitResultReq,
+			execCode:  execCode,
+		},
+	}
+	result.init(&result)
+
+	if execCode != 0 {
+		close(result.notifyFlag)
+		close(result.data)
+	}
+
+	return &result
+}
+
 type AsyncRHMonitorApi struct {
 	RHMonitorApi
 
 	promiseCache sync.Map
-	orderFlow    Result[Order]
-	tradeFlow    Result[Trade]
-	accountFlow  Result[Account]
-	positionFlow Result[Position]
+	flowCache    sync.Map
+	// orderFlow    Result[Order]
+	// tradeFlow    Result[Trade]
+	// accountFlow  Result[Account]
+	// positionFlow Result[Position]
 }
 
 func NewAsyncRHMonitorApi(brokerID, addr string, port int) *AsyncRHMonitorApi {
@@ -704,53 +742,146 @@ func (api *AsyncRHMonitorApi) OnRspOffsetOrder(offset *OffsetOrder, info *RspInf
 	}
 }
 
-func (api *AsyncRHMonitorApi) AsyncReqSubInvestorOrder(investor *Investor) Result[Order] {
-	if api.orderFlow == nil || api.orderFlow.GetExecCode() != 0 {
-		_, rtn := api.ReqSubInvestorOrder(investor)
-		api.orderFlow = NewSingleResult[Order](InfinitResultReq, rtn)
+func (api *AsyncRHMonitorApi) GetOrderFlow() Result[Order] {
+	if flow, exist := api.flowCache.Load(orderFlow); exist {
+		return flow.(Result[Order])
 	}
 
-	return api.orderFlow
+	return nil
+}
+
+func (api *AsyncRHMonitorApi) GetTradeFlow() Result[Trade] {
+	if flow, exist := api.flowCache.Load(tradeFlow); exist {
+		return flow.(Result[Trade])
+	}
+
+	return nil
+}
+
+func (api *AsyncRHMonitorApi) GetAccountFlow() Result[Account] {
+	if flow, exist := api.flowCache.Load(accountFlow); exist {
+		return flow.(Result[Account])
+	}
+
+	return nil
+}
+
+func (api *AsyncRHMonitorApi) GetPositionFlow() Result[Position] {
+	if flow, exist := api.flowCache.Load(positionFlow); exist {
+		return flow.(Result[Position])
+	}
+
+	return nil
+}
+
+func (api *AsyncRHMonitorApi) AsyncReqSubInvestorOrder(investor *Investor) Result[Order] {
+	api.ReqSubInvestorOrder(investor)
+
+	api.flowCache.LoadOrStore(
+		orderFlow, NewFlowResult[Order](0),
+	)
+
+	return api.GetOrderFlow()
+}
+
+func (api *AsyncRHMonitorApi) AsyncReqSubAllInvestorOrder() Result[Order] {
+	api.requests.WaitInvestorReady()
+
+	api.flowCache.LoadOrStore(
+		orderFlow, NewFlowResult[Order](0),
+	)
+
+	api.investors.ForEach(func(s string, i *Investor) bool {
+		api.ExecReqSubInvestorOrder(i)
+
+		return true
+	})
+
+	return api.GetOrderFlow()
 }
 
 func (api *AsyncRHMonitorApi) OnRtnOrder(order *Order) {
 	api.RHMonitorApi.OnRtnOrder(order)
 
-	if api.orderFlow != nil {
-		api.orderFlow.AppendResult(-1, order, false)
+	if flow := api.GetOrderFlow(); flow != nil {
+		flow.AppendResult(InfinitResultReq, order, false)
 	}
 }
 
 func (api *AsyncRHMonitorApi) AsyncReqSubInvestorTrade(investor *Investor) Result[Trade] {
-	if api.tradeFlow == nil || api.tradeFlow.GetExecCode() != 0 {
-		_, rtn := api.ReqSubInvestorTrade(investor)
-		api.tradeFlow = NewSingleResult[Trade](InfinitResultReq, rtn)
-	}
+	api.ReqSubInvestorTrade(investor)
 
-	return api.tradeFlow
+	api.flowCache.LoadOrStore(
+		tradeFlow, NewFlowResult[Trade](0),
+	)
+
+	return api.GetTradeFlow()
+}
+
+func (api *AsyncRHMonitorApi) AsyncReqSubAllInvestorTrade() Result[Trade] {
+	api.requests.WaitInvestorReady()
+
+	api.flowCache.LoadOrStore(
+		tradeFlow, NewFlowResult[Trade](0),
+	)
+
+	api.investors.ForEach(func(s string, i *Investor) bool {
+		api.ExecReqSubInvestorTrade(i)
+
+		return true
+	})
+
+	return api.GetTradeFlow()
 }
 
 func (api *AsyncRHMonitorApi) OnRtnTrade(trade *Trade) {
 	api.RHMonitorApi.OnRtnTrade(trade)
 
-	if api.tradeFlow != nil {
-		api.tradeFlow.AppendResult(InfinitResultReq, trade, false)
+	if flow := api.GetTradeFlow(); flow != nil {
+		flow.AppendResult(InfinitResultReq, trade, false)
 	}
 }
 
-// TODO: 查找持仓和资金的回报从哪个订阅回来，且需要重新考虑无限流中Await的逻辑
+func (api *AsyncRHMonitorApi) AsyncReqSubAllInvestorMoney() Result[Account] {
+	api.flowCache.LoadOrStore(
+		accountFlow, NewFlowResult[Account](0),
+	)
+
+	return api.GetAccountFlow()
+}
+
 func (api *AsyncRHMonitorApi) OnRtnInvestorMoney(account *Account) {
 	api.RHMonitorApi.OnRtnInvestorMoney(account)
 
-	if api.accountFlow != nil {
-		api.accountFlow.AppendResult(InfinitResultReq, account, false)
+	if flow := api.GetAccountFlow(); flow != nil {
+		flow.AppendResult(InfinitResultReq, account, false)
 	}
+}
+
+func (api *AsyncRHMonitorApi) AsyncReqSubInvestorPosition(investor *Investor) Result[Position] {
+	api.AsyncReqSubInvestorTrade(investor)
+
+	api.flowCache.LoadOrStore(
+		positionFlow, NewFlowResult[Position](0),
+	)
+
+	return api.GetPositionFlow()
+}
+
+func (api *AsyncRHMonitorApi) AsyncReqSubAllInvestorPosition() Result[Position] {
+	api.AsyncReqSubAllInvestorTrade()
+
+	api.flowCache.LoadOrStore(
+		positionFlow, NewFlowResult[Position](0),
+	)
+
+	return api.GetPositionFlow()
 }
 
 func (api *AsyncRHMonitorApi) OnRtnInvestorPosition(position *Position) {
 	api.RHMonitorApi.OnRtnInvestorPosition(position)
 
-	if api.positionFlow != nil {
-		api.positionFlow.AppendResult(InfinitResultReq, position, false)
+	if flow := api.GetPositionFlow(); flow != nil {
+		flow.AppendResult(InfinitResultReq, position, false)
 	}
 }
