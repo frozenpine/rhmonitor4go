@@ -51,12 +51,12 @@ func main() {
 		},
 	).Catch(
 		func(r rohon.Result[rohon.RspUserLogin]) error {
-			log.Print("Catch called.")
+			log.Print("test Catch called.")
 			return nil
 		},
 	).Finally(
 		func(r rohon.Result[rohon.RspUserLogin]) error {
-			log.Print("Final called.")
+			log.Print("test Final called.")
 			return nil
 		},
 	).Await(ctx, timeout); err != nil {
@@ -74,7 +74,14 @@ func main() {
 		log.Fatalf("AyncReqQryMonitorAccounts failed: %+v", err)
 	}
 
-	if err = api.AsyncReqQryAllInvestorMoney().Await(ctx, timeout); err != nil {
+	if err = api.AsyncReqQryAllInvestorMoney().Then(
+		func(r rohon.Result[rohon.Account]) error {
+			for acct := range r.GetData() {
+				fmt.Printf("AsyncOnRspQryInvestorMoney: %+v\n", acct)
+			}
+			return nil
+		},
+	).Await(ctx, timeout); err != nil {
 		log.Fatalf("AsyncReqQryAllInvestorMoney failed: %+v", err)
 	}
 

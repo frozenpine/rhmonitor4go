@@ -25,13 +25,15 @@ func init() {
 }
 
 // overwrite default api callback functions
+// connected, disconnected, login, logout, investor events
+// must call event handler to process flags
 type myApi struct {
 	rohon.RHMonitorApi
 }
 
 func (api *myApi) OnFrontConnected() {
+	api.HandleConnected()
 	log.Println("MyApi OnFrontConnected called.")
-	api.RHMonitorApi.OnFrontConnected()
 }
 
 func main() {

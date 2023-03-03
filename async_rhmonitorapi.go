@@ -588,7 +588,7 @@ func (api *AsyncRHMonitorApi) AsyncReqUserLogin(login *RiskUser) Result[RspUserL
 }
 
 func (api *AsyncRHMonitorApi) OnRspUserLogin(login *RspUserLogin, info *RspInfo, reqID int64) {
-	api.RHMonitorApi.OnRspUserLogin(login, info, reqID)
+	api.HandleLogin(login)
 
 	if async, exist := api.promiseCache.LoadAndDelete(reqID); exist {
 		result := async.(Result[RspUserLogin])
@@ -609,7 +609,7 @@ func (api *AsyncRHMonitorApi) AsyncReqUserLogout() Result[RspUserLogout] {
 }
 
 func (api *AsyncRHMonitorApi) OnRspUserLogout(logout *RspUserLogout, info *RspInfo, reqID int64) {
-	api.RHMonitorApi.OnRspUserLogout(logout, info, reqID)
+	api.HandleLogout(logout)
 
 	if async, exist := api.promiseCache.LoadAndDelete(reqID); exist {
 		result := async.(Result[RspUserLogout])
@@ -631,7 +631,7 @@ func (api *AsyncRHMonitorApi) AsyncReqQryMonitorAccounts() Result[Investor] {
 }
 
 func (api *AsyncRHMonitorApi) OnRspQryMonitorAccounts(investor *Investor, info *RspInfo, reqID int64, isLast bool) {
-	api.RHMonitorApi.OnRspQryMonitorAccounts(investor, info, reqID, isLast)
+	api.HandleInvestor(investor, isLast)
 
 	if promise, exist := api.promiseCache.Load(reqID); exist {
 		result := promise.(Result[Investor])
@@ -702,7 +702,7 @@ func (api *AsyncRHMonitorApi) AsyncReqQryInvestorPosition(investor *Investor, in
 }
 
 func (api *AsyncRHMonitorApi) OnRspQryInvestorPosition(pos *Position, info *RspInfo, reqID int64, isLast bool) {
-	api.RHMonitorApi.OnRspQryInvestorPosition(pos, info, reqID, isLast)
+	// api.RHMonitorApi.OnRspQryInvestorPosition(pos, info, reqID, isLast)
 
 	if async, exist := api.promiseCache.Load(reqID); exist {
 		result := async.(Result[Position])
@@ -801,7 +801,7 @@ func (api *AsyncRHMonitorApi) AsyncReqSubAllInvestorOrder() Result[Order] {
 }
 
 func (api *AsyncRHMonitorApi) OnRtnOrder(order *Order) {
-	api.RHMonitorApi.OnRtnOrder(order)
+	// api.RHMonitorApi.OnRtnOrder(order)
 
 	if flow := api.GetOrderFlow(); flow != nil {
 		flow.AppendResult(InfinitResultReq, order, false)
@@ -835,7 +835,7 @@ func (api *AsyncRHMonitorApi) AsyncReqSubAllInvestorTrade() Result[Trade] {
 }
 
 func (api *AsyncRHMonitorApi) OnRtnTrade(trade *Trade) {
-	api.RHMonitorApi.OnRtnTrade(trade)
+	// api.RHMonitorApi.OnRtnTrade(trade)
 
 	if flow := api.GetTradeFlow(); flow != nil {
 		flow.AppendResult(InfinitResultReq, trade, false)
@@ -851,7 +851,7 @@ func (api *AsyncRHMonitorApi) AsyncReqSubAllInvestorMoney() Result[Account] {
 }
 
 func (api *AsyncRHMonitorApi) OnRtnInvestorMoney(account *Account) {
-	api.RHMonitorApi.OnRtnInvestorMoney(account)
+	// api.RHMonitorApi.OnRtnInvestorMoney(account)
 
 	if flow := api.GetAccountFlow(); flow != nil {
 		flow.AppendResult(InfinitResultReq, account, false)
@@ -879,7 +879,7 @@ func (api *AsyncRHMonitorApi) AsyncReqSubAllInvestorPosition() Result[Position] 
 }
 
 func (api *AsyncRHMonitorApi) OnRtnInvestorPosition(position *Position) {
-	api.RHMonitorApi.OnRtnInvestorPosition(position)
+	// api.RHMonitorApi.OnRtnInvestorPosition(position)
 
 	if flow := api.GetPositionFlow(); flow != nil {
 		flow.AppendResult(InfinitResultReq, position, false)

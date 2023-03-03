@@ -339,9 +339,7 @@ func (api *RHMonitorApi) ReqSubAllInvestorTrade() int {
 	})
 }
 
-func (api *RHMonitorApi) OnFrontConnected() {
-	log.Printf("Rohon risk[%s:%d] connected.", api.remoteAddr, api.remotePort)
-
+func (api *RHMonitorApi) HandleConnected() {
 	api.requests.SetConnected(true)
 
 	if rtn := api.requests.RedoConnected(); rtn != 0 {
@@ -349,12 +347,32 @@ func (api *RHMonitorApi) OnFrontConnected() {
 	}
 }
 
-func (api *RHMonitorApi) OnFrontDisconnected(reason Reason) {
-	log.Printf("Rohon risk[%s:%d] disconnected: %s", api.remoteAddr, api.remotePort, reason)
+func (api *RHMonitorApi) OnFrontConnected() {
+	api.HandleConnected()
+	log.Printf("Rohon risk[%s:%d] connected.", api.remoteAddr, api.remotePort)
+}
 
+func (api *RHMonitorApi) HandleDisconnected() {
 	api.requests.SetInvestorReady(false)
 	api.requests.SetLogin(false)
 	api.requests.SetConnected(false)
+}
+
+func (api *RHMonitorApi) OnFrontDisconnected(reason Reason) {
+	api.HandleDisconnected()
+	log.Printf("Rohon risk[%s:%d] disconnected: %s", api.remoteAddr, api.remotePort, reason)
+}
+
+func (api *RHMonitorApi) HandleLogin(login *RspUserLogin) {
+	if login != nil {
+		api.requests.SetLogin(true)
+
+		if rtn := api.requests.RedoLoggedIn(); rtn != 0 {
+			log.Printf("Redo login failed with error: %d", rtn)
+		}
+	} else {
+		log.Print("User login response data is nil.")
+	}
 }
 
 func (api *RHMonitorApi) OnRspUserLogin(login *RspUserLogin, info *RspInfo, requestID int64) {
@@ -363,16 +381,18 @@ func (api *RHMonitorApi) OnRspUserLogin(login *RspUserLogin, info *RspInfo, requ
 		return
 	}
 
+	api.HandleLogin(login)
+
 	if login != nil {
 		log.Printf("User[%s] logged in: %s %s", api.riskUser.UserID, login.TradingDay, login.LoginTime)
+	}
+}
 
-		api.requests.SetLogin(true)
-
-		if rtn := api.requests.RedoLoggedIn(); rtn != 0 {
-			log.Printf("Redo login failed with error: %d", rtn)
-		}
+func (api *RHMonitorApi) HandleLogout(logout *RspUserLogout) {
+	if logout != nil {
+		api.requests.SetLogin(false)
 	} else {
-		log.Print("User login response data is nil.")
+		log.Print("User logout response data is nil.")
 	}
 }
 
@@ -384,10 +404,18 @@ func (api *RHMonitorApi) OnRspUserLogout(logout *RspUserLogout, info *RspInfo, r
 
 	if logout != nil {
 		log.Printf("User[%s] logged out.", logout.UserID)
+	}
+}
 
-		api.requests.SetLogin(false)
-	} else {
-		log.Print("User logout response data is nil.")
+func (api *RHMonitorApi) HandleInvestor(investor *Investor, isLast bool) {
+	if investor != nil {
+		api.investors.AddInvestor(investor)
+	}
+
+	if isLast {
+		api.requests.SetInvestorReady(true)
+
+		api.requests.RedoInvestorReady()
 	}
 }
 
@@ -397,7 +425,7 @@ func (api *RHMonitorApi) OnRspQryMonitorAccounts(investor *Investor, info *RspIn
 		return
 	}
 
-	api.investors.AddInvestor(investor)
+	api.HandleInvestor(investor, isLast)
 
 	if isLast {
 		log.Printf("All monitor account query finished: %d", api.investors.Size())
@@ -406,10 +434,6 @@ func (api *RHMonitorApi) OnRspQryMonitorAccounts(investor *Investor, info *RspIn
 			printData("OnRspQryMonitorAccounts", investor)
 			return true
 		})
-
-		api.requests.SetInvestorReady(true)
-
-		api.requests.RedoInvestorReady()
 	}
 }
 
