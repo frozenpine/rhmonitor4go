@@ -38,12 +38,14 @@ func main() {
 		flag.Parse()
 	}
 
+	log.Printf("Loading gRPC client cert pair")
 	cert, err := tls.LoadX509KeyPair(clientCert, clientKey)
 	if err != nil {
 		log.Fatalf("Load RPC cert pair failed: %+v", err)
 	}
 
 	caPool := x509.NewCertPool()
+	log.Printf("Loading gRPC client CA cert")
 	caData, err := os.ReadFile(ca)
 	if err != nil {
 		log.Fatalf("Load gRPC cert CA failed: %+v", err)
@@ -53,7 +55,7 @@ func main() {
 	}
 
 	tlsConfig := &tls.Config{
-		ServerName:   "riskhub.lingma.vip",
+		ServerName:   rpcAddr,
 		Certificates: []tls.Certificate{cert},
 		RootCAs:      caPool,
 	}
@@ -62,20 +64,61 @@ func main() {
 	signal.NotifyContext(ctx, os.Interrupt, os.Kill)
 
 	remoteAddr := fmt.Sprintf("%s:%d", rpcAddr, rpcPort)
+	log.Printf("Connecting to gRPC server: %s", remoteAddr)
 	conn, err := grpc.DialContext(
 		ctx, remoteAddr,
 		grpc.WithTransportCredentials(
 			credentials.NewTLS(tlsConfig),
 		),
 	)
+	// conn, err := grpc.DialContext(
+	// 	ctx, remoteAddr,
+	// 	grpc.WithTransportCredentials(insecure.NewCredentials()),
+	// )
 	if err != nil {
 		log.Fatalf("Connet to gRPC server[%s] failed: %+v", remoteAddr, err)
 	}
 	defer conn.Close()
 
-	cli := CLI{}
+	// cli := CLI{}
+	client := service.NewRohonMonitorClient(conn)
 
-	if err := cli.Serve(ctx, service.NewRohonMonitorClient(conn)); err != nil {
-		log.Fatalf("Client running failed: %+v", err)
+	var (
+		result      *service.Result
+		apiIdentity string
+	)
+
+	if result, err = client.Init(ctx, &service.Request{
+		Request: &service.Request_Front{
+			Front: &service.RiskServer{
+				ServerAddr: "210.22.96.58",
+				ServerPort: 1234,
+			},
+		},
+	}); err != nil {
+		log.Fatalf("Init remote risk api failed: %+v", err)
+	} else {
+		apiIdentity = result.GetApiIdentity()
+
+		log.Printf("Remote risk api initiated: %s", apiIdentity)
 	}
+
+	if result, err = client.ReqUserLogin(ctx, &service.Request{
+		ApiIdentity: apiIdentity,
+		Request: &service.Request_Login{
+			Login: &service.RiskUser{
+				UserId:   "rdfk",
+				Password: "888888",
+			},
+		},
+	}); err != nil {
+		log.Fatalf("Remote login failed: %+v", err)
+	} else {
+		log.Printf("Remote login: %+v", result.GetUserLogin())
+	}
+
+	// log.Printf("Starting gRPC client")
+	// if err := cli.Serve(ctx, service.NewRohonMonitorClient(conn)); err != nil {
+	// 	log.Fatalf("Client running failed: %+v", err)
+	// }
 }

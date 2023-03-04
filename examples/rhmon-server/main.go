@@ -38,18 +38,21 @@ func main() {
 	}
 
 	listenAddr := fmt.Sprintf("%s:%d", rpcAddr, rpcPort)
+	log.Printf("Binding gRPC listener: %s", listenAddr)
 	listen, err := net.Listen("tcp", listenAddr)
 
 	if err != nil {
 		log.Fatalf("Bind gRPC listening[tcp://%s] failed: %+v", listenAddr, err)
 	}
 
+	log.Printf("Loading gRPC server cert pair")
 	cert, err := tls.LoadX509KeyPair(svrCert, svrKey)
 	if err != nil {
 		log.Fatalf("Load RPC cert pair failed: %+v", err)
 	}
 
 	caPool := x509.NewCertPool()
+	log.Printf("Loading gRPC server CA cert")
 	caData, err := os.ReadFile(ca)
 	if err != nil {
 		log.Fatalf("Load gRPC cert CA failed: %+v", err)
@@ -65,8 +68,10 @@ func main() {
 	}
 
 	grpcSvr := grpc.NewServer(grpc.Creds(credentials.NewTLS(&tlsConfig)))
+	// grpcSvr := grpc.NewServer()
 	service.NewRohonMonitorHub(grpcSvr)
 
+	log.Printf("Starting gRPC server")
 	if err := grpcSvr.Serve(listen); err != nil {
 		log.Fatalf("Starting gRPC failed: %+v", err)
 	}
