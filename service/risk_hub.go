@@ -92,6 +92,8 @@ func (hub *RiskHub) Init(ctx context.Context, req *Request) (result *Result, err
 
 	identity := id.String()
 
+	result = &Result{}
+
 	hub.apiCache.Store(identity, &api)
 	result.ReqId = -1
 	result.Response = &Result_ApiIdentity{ApiIdentity: identity}
@@ -116,8 +118,9 @@ func (hub *RiskHub) ReqUserLogin(ctx context.Context, req *Request) (result *Res
 		return
 	}
 
-	if err = promise.Then(func(r rohon.Result[rohon.RspUserLogin]) error {
+	result = &Result{}
 
+	if err = promise.Then(func(r rohon.Result[rohon.RspUserLogin]) error {
 		login := <-r.GetData()
 
 		var pri_type PrivilegeType
@@ -162,6 +165,8 @@ func (hub *RiskHub) ReqUserLogout(ctx context.Context, req *Request) (result *Re
 		return
 	}
 
+	result = &Result{}
+
 	if err = promise.Then(func(r rohon.Result[rohon.RspUserLogout]) error {
 		logout := <-r.GetData()
 
@@ -194,6 +199,8 @@ func (hub *RiskHub) ReqQryMonitorAccounts(ctx context.Context, req *Request) (re
 	); err != nil {
 		return
 	}
+
+	result = &Result{}
 
 	if err = promise.Then(func(r rohon.Result[rohon.Investor]) error {
 		investors := InvestorList{}
@@ -247,6 +254,8 @@ func (hub *RiskHub) ReqQryInvestorMoney(ctx context.Context, req *Request) (resu
 			return
 		}
 	}
+
+	result = &Result{}
 
 	if err = promise.Then(func(r rohon.Result[rohon.Account]) error {
 		accounts := &AccountList{}

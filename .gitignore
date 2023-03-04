@@ -22,3 +22,8 @@ go.work
 
 **/log_files
 **/*.eddx
+
+examples/asyncrhmon/asyncrhmon*
+examples/rhmon-client/rhmon-client*
+examples/rhmon-server/rhmon-server*
+examples/rhmonitor/rhmonitor*
