@@ -1,8 +1,10 @@
 syntax = "proto3";
 
 package service;
+// go_package service;
 
 import "structures.proto";
+import "google/protobuf/empty.proto";
 
 message RiskServer {
   string broker_id = 1;
@@ -47,4 +49,5 @@ service RohonMonitor {
   rpc SubInvestorTrade(Request) returns (stream Trade) {}
   rpc SubInvestorMoney(Request) returns (stream Account) {}
   rpc SubInvestorPosition(Request) returns (stream Position) {}
+  rpc Release(Request) returns (google.protobuf.Empty) {}
 }

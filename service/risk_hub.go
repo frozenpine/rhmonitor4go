@@ -108,6 +108,7 @@ func (hub *RiskHub) ReqUserLogin(ctx context.Context, req *Request) (result *Res
 	}
 
 	var promise rohon.Promise[rohon.RspUserLogin]
+
 	if promise, err = checkPromise(
 		api.ins.AsyncReqUserLogin(&rohon.RiskUser{
 			UserID:   req.GetLogin().UserId,
