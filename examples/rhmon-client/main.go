@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"time"
 
 	"github.com/frozenpine/rhmonitor4go/service"
 	"google.golang.org/grpc"
@@ -21,6 +22,7 @@ var (
 	clientCert = "rhmonitor.crt"
 	clientKey  = "rhmonitor.key"
 	ca         = "ca.crt"
+	timeout    = 5
 )
 
 func init() {
@@ -31,6 +33,7 @@ func init() {
 	flag.StringVar(&clientCert, "cert", clientCert, "gRPC client cert path")
 	flag.StringVar(&clientKey, "key", clientKey, "gRPC client cert key path")
 	flag.StringVar(&ca, "ca", ca, "gRPC server cert CA path")
+	flag.IntVar(&timeout, "timeout", timeout, "gRPC call deadline in second")
 }
 
 func main() {
@@ -86,9 +89,13 @@ func main() {
 	var (
 		result      *service.Result
 		apiIdentity string
+		deadline    context.Context
+		cancel      context.CancelFunc
 	)
 
-	if result, err = client.Init(ctx, &service.Request{
+	deadline, cancel = context.WithTimeout(ctx, time.Second*time.Duration(timeout))
+
+	if result, err = client.Init(deadline, &service.Request{
 		Request: &service.Request_Front{
 			Front: &service.RiskServer{
 				ServerAddr: "210.22.96.58",
@@ -102,8 +109,11 @@ func main() {
 
 		log.Printf("Remote risk api initiated: %s", apiIdentity)
 	}
+	cancel()
 
-	if result, err = client.ReqUserLogin(ctx, &service.Request{
+	deadline, cancel = context.WithTimeout(ctx, time.Second*time.Duration(timeout))
+
+	if result, err = client.ReqUserLogin(deadline, &service.Request{
 		ApiIdentity: apiIdentity,
 		Request: &service.Request_Login{
 			Login: &service.RiskUser{
@@ -116,6 +126,7 @@ func main() {
 	} else {
 		log.Printf("Remote login: %+v", result.GetUserLogin())
 	}
+	cancel()
 
 	// log.Printf("Starting gRPC client")
 	// if err := cli.Serve(ctx, service.NewRohonMonitorClient(conn)); err != nil {
