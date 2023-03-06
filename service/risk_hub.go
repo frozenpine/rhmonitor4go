@@ -9,7 +9,7 @@ import (
 	"github.com/gofrs/uuid"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/reflection"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 var (
@@ -24,6 +24,34 @@ type riskApi struct {
 	ctx   context.Context
 	front *RiskServer
 }
+
+// type apiPool struct {
+// 	availablePool sync.Map
+// 	usedPool      sync.Map
+// 	timeout       time.Duration
+// }
+
+// func (pool *apiPool) createApiInstance(ctx context.Context, front RiskServer) (*riskApi, error) {
+// 	api, exist := pool.availablePool.Load(front)
+
+// 	if !exist {
+// 		ins := rohon.AsyncRHMonitorApi{}
+// 		if err := ins.Init(
+// 			front.BrokerId, front.ServerAddr,
+// 			int(front.ServerPort), &ins,
+// 		); err != nil {
+// 			return nil, err
+// 		} else {
+// 			api = &riskApi{
+// 				ins:   &ins,
+// 				ctx:   ctx,
+// 				front: &front,
+// 			}
+// 		}
+// 	}
+
+// 	return api.(*riskApi), nil
+// }
 
 func reqFinalFn[T rohon.RHRiskData](result *Result) rohon.CallbackFn[T] {
 	return func(req rohon.Result[T]) error {
@@ -46,6 +74,7 @@ func checkPromise[T rohon.RHRiskData](result rohon.Result[T], caller string) (ro
 type RiskHub struct {
 	UnimplementedRohonMonitorServer
 
+	svr           *grpc.Server
 	apiCache      sync.Map
 	apiReqTimeout time.Duration
 }
@@ -354,12 +383,27 @@ func (hub *RiskHub) ReqQryInvestorMoney(ctx context.Context, req *Request) (resu
 	return
 }
 
+func (hub *RiskHub) Release(ctx context.Context, req *Request) (empty *emptypb.Empty, err error) {
+	var api *riskApi
+	if api, err = hub.getApiInstance(req.GetApiIdentity()); err != nil {
+		return
+	}
+
+	api.ins.Release()
+
+	empty = &emptypb.Empty{}
+
+	return
+}
+
 func NewRohonMonitorHub(svr *grpc.Server) RohonMonitorServer {
-	pb := &RiskHub{}
+	pb := &RiskHub{
+		svr: svr,
+	}
 
 	RegisterRohonMonitorServer(svr, pb)
 
-	reflection.Register(svr)
+	// reflection.Register(svr)
 
 	return pb
 }

@@ -87,4 +87,6 @@ func main() {
 	// }
 
 	<-ctx.Done()
+
+	api.Release()
 }

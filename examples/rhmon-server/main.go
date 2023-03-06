@@ -67,7 +67,9 @@ func main() {
 		ClientCAs:    caPool,
 	}
 
-	grpcSvr := grpc.NewServer(grpc.Creds(credentials.NewTLS(&tlsConfig)))
+	grpcSvr := grpc.NewServer(
+		grpc.Creds(credentials.NewTLS(&tlsConfig)),
+	)
 	// grpcSvr := grpc.NewServer()
 	service.NewRohonMonitorHub(grpcSvr)
 

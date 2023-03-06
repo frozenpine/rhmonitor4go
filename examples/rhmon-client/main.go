@@ -81,7 +81,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("Connet to gRPC server[%s] failed: %+v", remoteAddr, err)
 	}
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			log.Printf("Fail to close gRPC conn: %+v", err)
+		} else {
+			log.Println("gRPC conn closed")
+		}
+	}()
 
 	// cli := CLI{}
 	client := service.NewRohonMonitorClient(conn)
@@ -99,7 +105,7 @@ func main() {
 		Request: &service.Request_Front{
 			Front: &service.RiskServer{
 				ServerAddr: "210.22.96.58",
-				ServerPort: 1234,
+				ServerPort: 11102,
 			},
 		},
 	}); err != nil {
@@ -110,6 +116,13 @@ func main() {
 		log.Printf("Remote risk api initiated: %s", apiIdentity)
 	}
 	cancel()
+	defer func() {
+		if _, err = client.Release(ctx, &service.Request{
+			ApiIdentity: apiIdentity,
+		}); err != nil {
+			log.Fatalf("Release api failed: %+v", err)
+		}
+	}()
 
 	deadline, cancel = context.WithTimeout(ctx, time.Second*time.Duration(timeout))
 
@@ -125,6 +138,24 @@ func main() {
 		log.Fatalf("Remote login failed: %+v", err)
 	} else {
 		log.Printf("Remote login: %+v", result.GetUserLogin())
+	}
+	cancel()
+
+	deadline, cancel = context.WithTimeout(ctx, time.Second*time.Duration(timeout))
+
+	if result, err = client.ReqQryMonitorAccounts(deadline, &service.Request{
+		ApiIdentity: apiIdentity,
+		// Request: &service.Request_Investor{
+		// 	Investor: &service.Investor{InvestorId: ""},
+		// },
+	}); err != nil {
+		log.Fatalf("Query accounts failed: +%v", err)
+	} else {
+		investors := result.GetInvestors()
+
+		for _, inv := range investors.Data {
+			fmt.Printf("gRPC query investor: %+v\n", inv)
+		}
 	}
 	cancel()
 
