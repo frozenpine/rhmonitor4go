@@ -159,6 +159,24 @@ func main() {
 	}
 	cancel()
 
+	stream, err := client.SubInvestorMoney(ctx, &service.Request{
+		ApiIdentity: apiIdentity,
+	})
+	if err != nil {
+		log.Fatalf("Subscribe investor's account failed: %+v", err)
+	}
+
+	for {
+		acct, err := stream.Recv()
+
+		if err != nil {
+			log.Printf("Receive investor's account failed: %+v", err)
+			break
+		}
+
+		fmt.Printf("OnRtnInvestorMoney %+v", acct)
+	}
+
 	// log.Printf("Starting gRPC client")
 	// if err := cli.Serve(ctx, service.NewRohonMonitorClient(conn)); err != nil {
 	// 	log.Fatalf("Client running failed: %+v", err)

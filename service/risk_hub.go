@@ -130,6 +130,19 @@ func (hub *RiskHub) Init(ctx context.Context, req *Request) (result *Result, err
 	return
 }
 
+func (hub *RiskHub) Release(ctx context.Context, req *Request) (empty *emptypb.Empty, err error) {
+	var api *riskApi
+	if api, err = hub.getApiInstance(req.GetApiIdentity()); err != nil {
+		return
+	}
+
+	api.ins.Release()
+
+	empty = &emptypb.Empty{}
+
+	return
+}
+
 func (hub *RiskHub) ReqUserLogin(ctx context.Context, req *Request) (result *Result, err error) {
 	var api *riskApi
 	if api, err = hub.getApiInstance(req.GetApiIdentity()); err != nil {
@@ -383,15 +396,106 @@ func (hub *RiskHub) ReqQryInvestorMoney(ctx context.Context, req *Request) (resu
 	return
 }
 
-func (hub *RiskHub) Release(ctx context.Context, req *Request) (empty *emptypb.Empty, err error) {
+func (hub *RiskHub) SubInvestorMoney(req *Request, stream RohonMonitor_SubInvestorMoneyServer) (err error) {
 	var api *riskApi
 	if api, err = hub.getApiInstance(req.GetApiIdentity()); err != nil {
 		return
 	}
 
-	api.ins.Release()
+	filter := req.GetInvestor()
 
-	empty = &emptypb.Empty{}
+	result := api.ins.AsyncReqSubAllInvestorMoney()
+
+	if err = result.Await(context.TODO(), hub.apiReqTimeout); err != nil {
+		err = errors.Wrap(err, "sub investor's money failed")
+
+		return
+	}
+
+	for acct := range result.GetData() {
+		var currencyID CurrencyID
+		switch acct.CurrencyID {
+		case "USD":
+			currencyID = USD
+		default:
+			currencyID = CNY
+		}
+
+		var bizType BusinessType
+		switch acct.BizType {
+		case rohon.RH_TRADE_BZTP_Future:
+			bizType = future
+		case rohon.RH_TRADE_BZTP_Stock:
+			bizType = stock
+		}
+
+		if filter != nil && filter.InvestorId != acct.AccountID {
+			continue
+		}
+
+		stream.Send(&Account{
+			Investor: &Investor{
+				BrokerId:   acct.BrokerID,
+				InvestorId: acct.AccountID,
+			},
+			PreCredit:              acct.PreCredit,
+			PreDeposit:             acct.PreDeposit,
+			PreBalance:             acct.PreBalance,
+			PreMargin:              acct.PreMargin,
+			InterestBase:           acct.InterestBase,
+			Interest:               acct.Interest,
+			Deposit:                acct.Deposit,
+			Withdraw:               acct.Withdraw,
+			FrozenMargin:           acct.FrozenMargin,
+			FrozenCash:             acct.FrozenCash,
+			FrozenCommission:       acct.FrozenCommission,
+			CurrentMargin:          acct.CurrMargin,
+			CashIn:                 acct.CashIn,
+			Commission:             acct.Commission,
+			CloseProfit:            acct.CloseProfit,
+			PositionProfit:         acct.PositionProfit,
+			Balance:                acct.Balance,
+			Available:              acct.Available,
+			WithdrawQuota:          acct.WithdrawQuota,
+			Reserve:                acct.Reserve,
+			TradingDay:             acct.TradingDay,
+			SettlementId:           int32(acct.SettlementID),
+			Credit:                 acct.Credit,
+			ExchangeMargin:         acct.ExchangeMargin,
+			DeliveryMargin:         acct.DeliveryMargin,
+			ExchangeDeliveryMargin: acct.ExchangeDeliveryMargin,
+			ReserveBalance:         acct.ReserveBalance,
+			CurrencyId:             currencyID,
+			MortgageInfo: &FundMortgage{
+				PreIn:       acct.PreFundMortgageIn,
+				PreOut:      acct.PreFundMortgageOut,
+				PreMortgage: acct.PreMortgage,
+				CurrentIn:   acct.FundMortgageIn,
+				CurrentOut:  acct.FundMortgageOut,
+				Mortgage:    acct.Mortgage,
+				Available:   acct.FundMortgageAvailable,
+				Mortgagable: acct.MortgageableFund,
+			},
+			SpecProductInfo: &SpecProduct{
+				Margin:              acct.SpecProductMargin,
+				FrozenMargin:        acct.SpecProductFrozenMargin,
+				Commission:          acct.SpecProductCommission,
+				FrozenCommission:    acct.SpecProductFrozenCommission,
+				PositionProfit:      acct.SpecProductPositionProfit,
+				CloseProfit:         acct.SpecProductCloseProfit,
+				PositionProfitByAlg: acct.SpecProductPositionProfitByAlg,
+				ExchangeMargin:      acct.SpecProductExchangeMargin,
+			},
+			BusinessType:      bizType,
+			FrozenSwap:        acct.FrozenSwap,
+			RemainSwap:        acct.RemainSwap,
+			StockMarketValue:  acct.TotalStockMarketValue,
+			OptionMarketValue: acct.TotalOptionMarketValue,
+			DynamicMoney:      acct.DynamicMoney,
+			Premium:           acct.Premium,
+			MarketValueEquity: acct.MarketValueEquity,
+		})
+	}
 
 	return
 }

@@ -529,6 +529,8 @@ type FlowResult[T RHRiskData] struct {
 }
 
 func (r *FlowResult[T]) Await(ctx context.Context, timeout time.Duration) error {
+	r.finish.Add(1)
+
 	go r.awaitLoop()
 
 	if r.GetExecCode() != 0 {
