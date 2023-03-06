@@ -258,6 +258,14 @@ enum ContingentCondition {
   last_price_less_than_stop_price = 6;
   last_price_less_equal_stop_price = 7;
   ask_price_greate_than_stop_price = 8;
+  ask_price_greate_equal_stop_price = 9;
+  ask_price_less_than_stop_price = 10;
+  ask_price_less_equal_stop_price = 11;
+  bid_price_greate_than_stop_price = 12;
+  bid_price_greate_equal_stop_price = 13;
+  bid_price_less_than_stop_price = 14;
+  bid_price_less_equal_stop_price = 15;
+  close_yesterday_first = 16;
 }
 
 enum ForceCloseReason {
@@ -292,6 +300,9 @@ enum OrderSource {
   server_condition_order = 7;
   server_loss_order = 8;
   server_profit_order = 9;
+  server_loss_ensure_order = 10;
+  server_profit_ensure_order = 11;
+  server_parked_order = 12;
 }
 
 enum OrderStatus {

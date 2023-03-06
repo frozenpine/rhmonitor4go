@@ -166,24 +166,10 @@ func (hub *RiskHub) ReqUserLogin(ctx context.Context, req *Request) (result *Res
 	if err = promise.Then(func(r rohon.Result[rohon.RspUserLogin]) error {
 		login := <-r.GetData()
 
-		var pri_type PrivilegeType
-
-		switch login.PrivilegeType {
-		case rohon.RH_MONITOR_ADMINISTRATOR:
-			pri_type = admin
-		case rohon.RH_MONITOR_NOMAL:
-			pri_type = user
-		}
-
 		result.Response = &Result_UserLogin{
-			UserLogin: &RspUserLogin{
-				UserId:        login.UserID,
-				TradingDay:    login.TradingDay,
-				LoginTime:     login.LoginTime,
-				PrivilegeType: pri_type,
-				PrivilegeInfo: login.InfoPrivilegeType.ToDict(),
-			},
+			UserLogin: convertRspLogin(login),
 		}
+
 		return nil
 	}).Finally(
 		reqFinalFn[rohon.RspUserLogin](result),
@@ -214,9 +200,7 @@ func (hub *RiskHub) ReqUserLogout(ctx context.Context, req *Request) (result *Re
 		logout := <-r.GetData()
 
 		result.Response = &Result_UserLogout{
-			UserLogout: &RspUserLogout{
-				UserId: logout.UserID,
-			},
+			UserLogout: convertRspLogout(logout),
 		}
 
 		return nil
@@ -249,10 +233,7 @@ func (hub *RiskHub) ReqQryMonitorAccounts(ctx context.Context, req *Request) (re
 		investors := InvestorList{}
 
 		for inv := range r.GetData() {
-			investors.Data = append(investors.Data, &Investor{
-				BrokerId:   inv.BrokerID,
-				InvestorId: inv.InvestorID,
-			})
+			investors.Data = append(investors.Data, convertInvestor(inv))
 		}
 
 		result.Response = &Result_Investors{
@@ -304,84 +285,7 @@ func (hub *RiskHub) ReqQryInvestorMoney(ctx context.Context, req *Request) (resu
 		accounts := &AccountList{}
 
 		for acct := range r.GetData() {
-			var currencyID CurrencyID
-			switch acct.CurrencyID {
-			case "USD":
-				currencyID = USD
-			default:
-				currencyID = CNY
-			}
-
-			var bizType BusinessType
-			switch acct.BizType {
-			case rohon.RH_TRADE_BZTP_Future:
-				bizType = future
-			case rohon.RH_TRADE_BZTP_Stock:
-				bizType = stock
-			}
-
-			accounts.Data = append(accounts.Data, &Account{
-				Investor: &Investor{
-					BrokerId:   acct.BrokerID,
-					InvestorId: acct.AccountID,
-				},
-				PreCredit:              acct.PreCredit,
-				PreDeposit:             acct.PreDeposit,
-				PreBalance:             acct.PreBalance,
-				PreMargin:              acct.PreMargin,
-				InterestBase:           acct.InterestBase,
-				Interest:               acct.Interest,
-				Deposit:                acct.Deposit,
-				Withdraw:               acct.Withdraw,
-				FrozenMargin:           acct.FrozenMargin,
-				FrozenCash:             acct.FrozenCash,
-				FrozenCommission:       acct.FrozenCommission,
-				CurrentMargin:          acct.CurrMargin,
-				CashIn:                 acct.CashIn,
-				Commission:             acct.Commission,
-				CloseProfit:            acct.CloseProfit,
-				PositionProfit:         acct.PositionProfit,
-				Balance:                acct.Balance,
-				Available:              acct.Available,
-				WithdrawQuota:          acct.WithdrawQuota,
-				Reserve:                acct.Reserve,
-				TradingDay:             acct.TradingDay,
-				SettlementId:           int32(acct.SettlementID),
-				Credit:                 acct.Credit,
-				ExchangeMargin:         acct.ExchangeMargin,
-				DeliveryMargin:         acct.DeliveryMargin,
-				ExchangeDeliveryMargin: acct.ExchangeDeliveryMargin,
-				ReserveBalance:         acct.ReserveBalance,
-				CurrencyId:             currencyID,
-				MortgageInfo: &FundMortgage{
-					PreIn:       acct.PreFundMortgageIn,
-					PreOut:      acct.PreFundMortgageOut,
-					PreMortgage: acct.PreMortgage,
-					CurrentIn:   acct.FundMortgageIn,
-					CurrentOut:  acct.FundMortgageOut,
-					Mortgage:    acct.Mortgage,
-					Available:   acct.FundMortgageAvailable,
-					Mortgagable: acct.MortgageableFund,
-				},
-				SpecProductInfo: &SpecProduct{
-					Margin:              acct.SpecProductMargin,
-					FrozenMargin:        acct.SpecProductFrozenMargin,
-					Commission:          acct.SpecProductCommission,
-					FrozenCommission:    acct.SpecProductFrozenCommission,
-					PositionProfit:      acct.SpecProductPositionProfit,
-					CloseProfit:         acct.SpecProductCloseProfit,
-					PositionProfitByAlg: acct.SpecProductPositionProfitByAlg,
-					ExchangeMargin:      acct.SpecProductExchangeMargin,
-				},
-				BusinessType:      bizType,
-				FrozenSwap:        acct.FrozenSwap,
-				RemainSwap:        acct.RemainSwap,
-				StockMarketValue:  acct.TotalStockMarketValue,
-				OptionMarketValue: acct.TotalOptionMarketValue,
-				DynamicMoney:      acct.DynamicMoney,
-				Premium:           acct.Premium,
-				MarketValueEquity: acct.MarketValueEquity,
-			})
+			accounts.Data = append(accounts.Data, convertAccount(acct))
 		}
 
 		result.Response = &Result_Accounts{Accounts: accounts}
@@ -391,6 +295,66 @@ func (hub *RiskHub) ReqQryInvestorMoney(ctx context.Context, req *Request) (resu
 		reqFinalFn[rohon.Account](result),
 	).Await(ctx, hub.apiReqTimeout); err != nil {
 		err = errors.Wrap(err, "[ReqQryInvestorMoney] wait rsp result failed")
+	}
+
+	return
+}
+
+func (hub *RiskHub) SubInvestorOrder(req *Request, stream RohonMonitor_SubInvestorOrderServer) (err error) {
+	var api *riskApi
+	if api, err = hub.getApiInstance(req.GetApiIdentity()); err != nil {
+		return
+	}
+
+	var result rohon.Result[rohon.Order]
+
+	if inv := req.GetInvestor(); inv != nil {
+		result = api.ins.AsyncReqSubInvestorOrder(&rohon.Investor{
+			BrokerID:   inv.BrokerId,
+			InvestorID: inv.InvestorId,
+		})
+	} else {
+		result = api.ins.AsyncReqSubAllInvestorOrder()
+	}
+
+	if err = result.Await(stream.Context(), hub.apiReqTimeout); err != nil {
+		err = errors.Wrap(err, "sub investor's order failed")
+
+		return
+	}
+
+	for ord := range result.GetData() {
+		stream.Send(convertOrder(ord))
+	}
+
+	return
+}
+
+func (hub *RiskHub) SubInvestorTrade(req *Request, stream RohonMonitor_SubInvestorTradeServer) (err error) {
+	var api *riskApi
+	if api, err = hub.getApiInstance(req.GetApiIdentity()); err != nil {
+		return
+	}
+
+	var result rohon.Result[rohon.Trade]
+
+	if inv := req.GetInvestor(); inv != nil {
+		result = api.ins.AsyncReqSubInvestorTrade(&rohon.Investor{
+			BrokerID:   inv.BrokerId,
+			InvestorID: inv.InvestorId,
+		})
+	} else {
+		result = api.ins.AsyncReqSubAllInvestorTrade()
+	}
+
+	if err = result.Await(stream.Context(), hub.apiReqTimeout); err != nil {
+		err = errors.Wrap(err, "sub investor's trade failed")
+
+		return
+	}
+
+	for td := range result.GetData() {
+		stream.Send(convertTrade(td))
 	}
 
 	return
@@ -406,7 +370,7 @@ func (hub *RiskHub) SubInvestorMoney(req *Request, stream RohonMonitor_SubInvest
 
 	result := api.ins.AsyncReqSubAllInvestorMoney()
 
-	if err = result.Await(context.TODO(), hub.apiReqTimeout); err != nil {
+	if err = result.Await(stream.Context(), hub.apiReqTimeout); err != nil {
 		err = errors.Wrap(err, "sub investor's money failed")
 
 		return
@@ -417,88 +381,37 @@ func (hub *RiskHub) SubInvestorMoney(req *Request, stream RohonMonitor_SubInvest
 			continue
 		}
 
-		var currencyID CurrencyID
-		switch acct.CurrencyID {
-		case "USD":
-			currencyID = USD
-		default:
-			currencyID = CNY
-		}
+		stream.Send(convertAccount(acct))
+	}
 
-		var bizType BusinessType
-		switch acct.BizType {
-		case rohon.RH_TRADE_BZTP_Future:
-			bizType = future
-		case rohon.RH_TRADE_BZTP_Stock:
-			bizType = stock
-		}
+	return
+}
 
-		if filter != nil && filter.InvestorId != acct.AccountID {
-			continue
-		}
+func (hub *RiskHub) SubInvestorPosition(req *Request, stream RohonMonitor_SubInvestorPositionServer) (err error) {
+	var api *riskApi
+	if api, err = hub.getApiInstance(req.GetApiIdentity()); err != nil {
+		return
+	}
 
-		stream.Send(&Account{
-			Investor: &Investor{
-				BrokerId:   acct.BrokerID,
-				InvestorId: acct.AccountID,
-			},
-			PreCredit:              acct.PreCredit,
-			PreDeposit:             acct.PreDeposit,
-			PreBalance:             acct.PreBalance,
-			PreMargin:              acct.PreMargin,
-			InterestBase:           acct.InterestBase,
-			Interest:               acct.Interest,
-			Deposit:                acct.Deposit,
-			Withdraw:               acct.Withdraw,
-			FrozenMargin:           acct.FrozenMargin,
-			FrozenCash:             acct.FrozenCash,
-			FrozenCommission:       acct.FrozenCommission,
-			CurrentMargin:          acct.CurrMargin,
-			CashIn:                 acct.CashIn,
-			Commission:             acct.Commission,
-			CloseProfit:            acct.CloseProfit,
-			PositionProfit:         acct.PositionProfit,
-			Balance:                acct.Balance,
-			Available:              acct.Available,
-			WithdrawQuota:          acct.WithdrawQuota,
-			Reserve:                acct.Reserve,
-			TradingDay:             acct.TradingDay,
-			SettlementId:           int32(acct.SettlementID),
-			Credit:                 acct.Credit,
-			ExchangeMargin:         acct.ExchangeMargin,
-			DeliveryMargin:         acct.DeliveryMargin,
-			ExchangeDeliveryMargin: acct.ExchangeDeliveryMargin,
-			ReserveBalance:         acct.ReserveBalance,
-			CurrencyId:             currencyID,
-			MortgageInfo: &FundMortgage{
-				PreIn:       acct.PreFundMortgageIn,
-				PreOut:      acct.PreFundMortgageOut,
-				PreMortgage: acct.PreMortgage,
-				CurrentIn:   acct.FundMortgageIn,
-				CurrentOut:  acct.FundMortgageOut,
-				Mortgage:    acct.Mortgage,
-				Available:   acct.FundMortgageAvailable,
-				Mortgagable: acct.MortgageableFund,
-			},
-			SpecProductInfo: &SpecProduct{
-				Margin:              acct.SpecProductMargin,
-				FrozenMargin:        acct.SpecProductFrozenMargin,
-				Commission:          acct.SpecProductCommission,
-				FrozenCommission:    acct.SpecProductFrozenCommission,
-				PositionProfit:      acct.SpecProductPositionProfit,
-				CloseProfit:         acct.SpecProductCloseProfit,
-				PositionProfitByAlg: acct.SpecProductPositionProfitByAlg,
-				ExchangeMargin:      acct.SpecProductExchangeMargin,
-			},
-			BusinessType:      bizType,
-			FrozenSwap:        acct.FrozenSwap,
-			RemainSwap:        acct.RemainSwap,
-			StockMarketValue:  acct.TotalStockMarketValue,
-			OptionMarketValue: acct.TotalOptionMarketValue,
-			DynamicMoney:      acct.DynamicMoney,
-			Premium:           acct.Premium,
-			MarketValueEquity: acct.MarketValueEquity,
-		})
+	var result rohon.Result[rohon.Position]
+
+	if inv := req.GetInvestor(); inv != nil {
+		result = api.ins.AsyncReqQryInvestorPosition(&rohon.Investor{
+			BrokerID:   inv.BrokerId,
+			InvestorID: inv.InvestorId,
+		}, "")
+	} else {
+		result = api.ins.AsyncReqSubAllInvestorPosition()
+	}
+
+	if err = result.Await(stream.Context(), hub.apiReqTimeout); err != nil {
+		err = errors.Wrap(err, "sub investor's postion failed")
+
+		return
+	}
+
+	for pos := range result.GetData() {
+		stream.Send(convertPosition(pos))
 	}
 
 	return
