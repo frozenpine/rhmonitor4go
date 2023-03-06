@@ -148,6 +148,52 @@ var (
 		rohon.RH_TRADE_ORDT_FinancingSell:         finacing_sell,
 		rohon.RH_TRADE_ORDT_RepayStock:            repay_stock,
 	}
+
+	tradingRoleMap = map[rohon.TradingRole]TradingRole{
+		rohon.RH_TRADE_ER_Broker: broker,
+		rohon.RH_TRADE_ER_Host:   host,
+		rohon.RH_TRADE_ER_Maker:  maker,
+	}
+
+	offsetFlagMap = map[rohon.OffsetFlag]OffsetFlag{
+		rohon.RH_TRADE_OF_Open:            open,
+		rohon.RH_TRADE_OF_Close:           close,
+		rohon.RH_TRADE_OF_ForceClose:      force_close,
+		rohon.RH_TRADE_OF_CloseToday:      close_today,
+		rohon.RH_TRADE_OF_CloseYesterday:  close_yesterday,
+		rohon.RH_TRADE_OF_ForceOff:        force_off,
+		rohon.RH_TRADE_OF_LocalForceClose: local_force_off,
+	}
+
+	hedgeFlagMap = map[rohon.HedgeFlag]HedgeFlag{
+		rohon.RH_TRADE_HF_Speculation: speculation,
+		rohon.RH_TRADE_HF_Arbitrage:   arbitrage,
+		rohon.RH_TRADE_HF_Hedge:       hedge,
+		rohon.RH_TRADE_HF_MarketMaker: market_maker,
+	}
+
+	tradeTypeMap = map[rohon.TradeType]TradeType{
+		rohon.RH_TRADE_TRDT_SplitCombination:   split_combination,
+		rohon.RH_TRADE_TRDT_Common:             common,
+		rohon.RH_TRADE_TRDT_OptionsExecution:   options_execution,
+		rohon.RH_TRADE_TRDT_OTC:                otc,
+		rohon.RH_TRADE_TRDT_EFPDerived:         efp_derived,
+		rohon.RH_TRADE_TRDT_CombinationDerived: combination_derived,
+		rohon.RH_TRADE_TRDT_FinancingBuy:       finacing_buy,
+		rohon.RH_TRADE_TRDT_RepayStock_Auto:    repay_stock_auto,
+		rohon.RH_TRADE_TRDT_RepayStock_Manual:  repay_stock_manual,
+	}
+
+	priceSrcMap = map[rohon.PriceSource]PriceSource{
+		rohon.RH_TRADE_PSRC_LastPrice: ps_last_price,
+		rohon.RH_TRADE_PSRC_Buy:       ps_buy,
+		rohon.RH_TRADE_PSRC_Sell:      ps_sell,
+	}
+
+	tradeSrcMap = map[rohon.TradeSource]TradeSource{
+		rohon.TRH_TSRC_NORMAL: ts_normal,
+		rohon.TRH_TSRC_QUERY:  ts_query,
+	}
 )
 
 func convertRspLogin(login *rohon.RspUserLogin) *RspUserLogin {
@@ -240,13 +286,61 @@ func convertOrder(ord *rohon.Order) *Order {
 }
 
 func convertTrade(td *rohon.Trade) *Trade {
-	// TODO: convert data
-	return &Trade{}
+	return &Trade{
+		Investor: &Investor{
+			BrokerId:   td.BrokerID,
+			InvestorId: td.InvestorID,
+		},
+		InstrumentId:         td.InstrumentID,
+		OrderRef:             td.OrderRef,
+		UserId:               td.UserID,
+		ExchangeId:           td.ExchangeID,
+		TradeId:              td.TradeID,
+		Direction:            directionMap[td.Direction],
+		OrderSysId:           td.OrderSysID,
+		ParticipantId:        td.ParticipantID,
+		ClientId:             td.ClientID,
+		TradingRole:          tradingRoleMap[td.TradingRole],
+		ExchangeInstrumentId: td.ExchangeInstID,
+		OffsetFlag:           offsetFlagMap[td.OffsetFlag],
+		HedgeFlag:            hedgeFlagMap[td.HedgeFlag],
+		Price:                td.Price,
+		Volume:               int32(td.Volume),
+		TradeDate:            td.TradeDate,
+		TradeTime:            td.TradeTime,
+		TradeType:            tradeTypeMap[td.TradeType],
+		PriceSource:          priceSrcMap[td.PriceSource],
+		TraderId:             td.TraderID,
+		OrderLocalId:         td.OrderLocalID,
+		ClearingPartId:       td.ClearingPartID,
+		BusinessUnit:         td.BusinessUnit,
+		SequenceNo:           int32(td.SequenceNo),
+		TradingDay:           td.TradingDay,
+		SettlementId:         int32(td.SettlementID),
+		BrokerOrderSeqence:   int32(td.BrokerOrderSeq),
+		TradeSource:          tradeSrcMap[td.TradeSource],
+		InvestorUnitId:       td.InvestUnitID,
+	}
 }
 
 func convertPosition(pos *rohon.Position) *Position {
-	// TODO: convert data
-	return &Position{}
+	return &Position{
+		Investor: &Investor{
+			BrokerId:   pos.BrokerID,
+			InvestorId: pos.InvestorID,
+		},
+		ProductId:         pos.ProductID,
+		InstrumentId:      pos.InstrumentID,
+		HedgeFlag:         hedgeFlagMap[pos.HedgeFlag],
+		Direction:         directionMap[pos.Direction],
+		Volume:            int32(pos.Volume),
+		Margin:            pos.Margin,
+		AvgOpenPriceByVol: pos.AvgOpenPriceByVol,
+		AvgOpenPrice:      pos.AvgOpenPrice,
+		TodayVolume:       int32(pos.TodayVolume),
+		FrozenVolume:      int32(pos.FrozenVolume),
+		EntryType:         uint32(pos.EntryType),
+	}
 }
 
 func convertAccount(acct *rohon.Account) *Account {
