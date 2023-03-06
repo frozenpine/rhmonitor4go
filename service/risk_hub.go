@@ -413,6 +413,10 @@ func (hub *RiskHub) SubInvestorMoney(req *Request, stream RohonMonitor_SubInvest
 	}
 
 	for acct := range result.GetData() {
+		if filter != nil && filter.InvestorId != acct.AccountID {
+			continue
+		}
+
 		var currencyID CurrencyID
 		switch acct.CurrencyID {
 		case "USD":
