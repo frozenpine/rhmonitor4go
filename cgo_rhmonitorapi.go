@@ -54,6 +54,7 @@ type RHRiskApi interface {
 	ReqSubPushInfo(*SubInfo) (int64, int)
 	ReqSubInvestorOrder(*Investor) (int64, int)
 	ReqSubInvestorTrade(*Investor) (int64, int)
+	Release()
 }
 
 type RHMonitorApi struct {
@@ -521,6 +522,14 @@ func (api *RHMonitorApi) Init(brokerID, addr string, port int, spi RHRiskSpi) er
 	})
 
 	return nil
+}
+
+func (api *RHMonitorApi) Release() {
+	api.releaseOnce.Do(
+		func() {
+			C.Release(api.cInstance)
+		},
+	)
 }
 
 func NewRHMonitorApi(brokerID, addr string, port int) *RHMonitorApi {
