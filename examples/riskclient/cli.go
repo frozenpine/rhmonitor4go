@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"reflect"
 	"runtime"
 	"strings"
 	"sync"
@@ -16,11 +17,14 @@ import (
 
 type command struct {
 	client service.RohonMonitorClient
-	cmd    string
-	args   []string
+	cmd    reflect.Method
+	// args   []interface{}
+	args []string
 }
 
 func (cmd *command) Execute() error {
+	log.Printf("Executing %s with args: %v", cmd.cmd.Name, cmd.args)
+
 	return nil
 }
 
@@ -29,11 +33,12 @@ var cmdCache = sync.Pool{New: func() any { return &command{} }}
 const cmdPrefix = "> "
 
 type CLI struct {
-	ctx    context.Context
-	cancel context.CancelFunc
-	start  sync.Once
-	stop   sync.Once
-	client service.RohonMonitorClient
+	ctx     context.Context
+	cancel  context.CancelFunc
+	start   sync.Once
+	stop    sync.Once
+	client  service.RohonMonitorClient
+	methods map[string]reflect.Method
 }
 
 func (cli *CLI) quit() {
@@ -43,13 +48,19 @@ func (cli *CLI) quit() {
 }
 
 func (cli *CLI) newCMD(cmd string, args ...string) *command {
+	method, exist := cli.methods[cmd]
+	if !exist {
+		return nil
+	}
+
 	c := cmdCache.Get().(*command)
 	runtime.SetFinalizer(c, func(obj interface{}) {
 		cmdCache.Put(obj)
 	})
 
 	c.client = cli.client
-	c.cmd = cmd
+	c.cmd = method
+
 	c.args = args
 
 	return c
@@ -115,6 +126,10 @@ func (cli *CLI) cmdLoop() {
 			}
 
 			cmd := cli.newCMD(buffer[0], buffer[1:]...)
+			if cmd == nil {
+				log.Printf("Command[%s] not exist", buffer[0])
+				continue
+			}
 
 			if err := cmd.Execute(); err != nil {
 				log.Printf("Command execution failed: %+v", err)
@@ -134,6 +149,13 @@ func (cli *CLI) Serve(ctx context.Context, client service.RohonMonitorClient) er
 		}
 
 		cli.ctx, cli.cancel = context.WithCancel(ctx)
+
+		clientType := reflect.TypeOf(client)
+
+		for i := 0; i < clientType.NumMethod(); i++ {
+			method := clientType.Method(i)
+			cli.methods[method.Name] = method
+		}
 
 		go cli.cmdLoop()
 	})
