@@ -25,5 +25,7 @@ go.work
 
 examples/asyncrhmon/asyncrhmon*
 examples/rhmon-client/rhmon-client*
+examples/riskclient/riskclient*
 examples/rhmon-server/rhmon-server*
+examples/riskhub/riskhub*
 examples/rhmonitor/rhmonitor*

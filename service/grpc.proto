@@ -38,6 +38,8 @@ message Request {
   }
 }
 
+message Broadcast { string message = 1; }
+
 service RohonMonitor {
   rpc Init(Request) returns (Result) {}
   rpc ReqUserLogin(Request) returns (Result) {}
@@ -45,6 +47,7 @@ service RohonMonitor {
   rpc ReqQryMonitorAccounts(Request) returns (Result) {}
   rpc ReqQryInvestorMoney(Request) returns (Result) {}
   rpc ReqQryInvestorPosition(Request) returns (Result) {}
+  rpc SubBroadcast(Request) returns (stream Broadcast) {}
   rpc SubInvestorOrder(Request) returns (stream Order) {}
   rpc SubInvestorTrade(Request) returns (stream Trade) {}
   rpc SubInvestorMoney(Request) returns (stream Account) {}

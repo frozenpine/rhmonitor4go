@@ -518,6 +518,7 @@ func (api *RHMonitorApi) Init(brokerID, addr string, port int, spi RHRiskSpi) er
 		}
 		RegisterRHRiskSpi(api.cInstance, spi)
 
+		log.Printf("Initializing risk api for: %s:%d", ip, port)
 		C.Init(api.cInstance, C.CString(ip.String()), C.uint(port))
 	})
 

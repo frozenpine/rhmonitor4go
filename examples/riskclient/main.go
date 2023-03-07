@@ -124,6 +124,28 @@ func main() {
 		}
 	}()
 
+	var broadcast service.RohonMonitor_SubBroadcastClient
+	if broadcast, err = client.SubBroadcast(ctx, &service.Request{
+		ApiIdentity: apiIdentity,
+	}); err != nil {
+		log.Printf("Sub broadcast failed: %+v", err)
+	} else {
+		go func() {
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+					if msg, err := broadcast.Recv(); err != nil {
+						log.Printf("Receive broadcast failed: %+v", err)
+					} else {
+						log.Printf("Broadcast received: %s", msg.Message)
+					}
+				}
+			}
+		}()
+	}
+
 	deadline, cancel = context.WithTimeout(ctx, time.Second*time.Duration(timeout))
 
 	if result, err = client.ReqUserLogin(deadline, &service.Request{
