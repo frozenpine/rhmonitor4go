@@ -1,4 +1,4 @@
-package rhmonitor4go
+package api
 
 /*
 #cgo CFLAGS: -I${SRCDIR}/include
@@ -11,7 +11,6 @@ import (
 	"io"
 	"log"
 	"reflect"
-	"sync"
 	"unsafe"
 
 	"golang.org/x/text/encoding/simplifiedchinese"
@@ -46,34 +45,4 @@ func CopyN(dst []byte, src unsafe.Pointer, len int) {
 	}))
 
 	copy(dst, tmpSlice)
-}
-
-var stringBuffer = sync.Pool{New: func() any { return make([]byte, 0, 100) }}
-
-type StringBuffer struct {
-	buffer *bytes.Buffer
-	under  []byte
-}
-
-func (buf *StringBuffer) Release() {
-	stringBuffer.Put(buf.under[:0])
-}
-
-func (buf *StringBuffer) WriteString(v string) (int, error) {
-	return buf.buffer.WriteString(v)
-}
-
-func (buf *StringBuffer) String() string {
-	return buf.buffer.String()
-}
-
-func NewStringBuffer() *StringBuffer {
-	under := stringBuffer.Get().([]byte)
-
-	buf := StringBuffer{
-		buffer: bytes.NewBuffer(under),
-		under:  under,
-	}
-
-	return &buf
 }

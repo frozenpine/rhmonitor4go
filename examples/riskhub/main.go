@@ -9,7 +9,7 @@ import (
 	"net"
 	"os"
 
-	"github.com/frozenpine/rhmonitor4go/service"
+	"github.com/frozenpine/rhmonitor4go/service/hub"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
@@ -71,7 +71,7 @@ func main() {
 		grpc.Creds(credentials.NewTLS(&tlsConfig)),
 	)
 	// grpcSvr := grpc.NewServer()
-	service.NewRohonMonitorHub(grpcSvr)
+	hub.NewRohonMonitorHub(grpcSvr)
 
 	log.Printf("Starting gRPC server")
 	if err := grpcSvr.Serve(listen); err != nil {

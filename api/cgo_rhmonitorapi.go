@@ -1,4 +1,4 @@
-package rhmonitor4go
+package api
 
 /*
 #cgo CFLAGS: -I${SRCDIR}/include
@@ -15,6 +15,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/frozenpine/rhmonitor4go"
 	"github.com/pkg/errors"
 )
 
@@ -26,7 +27,7 @@ var (
 	MoneyTopic     = "money"
 )
 
-func CheckRspInfo(info *RspInfo) error {
+func CheckRspInfo(info *rhmonitor4go.RspInfo) error {
 	if info == nil {
 		return nil
 	}
@@ -38,22 +39,26 @@ func CheckRspInfo(info *RspInfo) error {
 	return nil
 }
 
-func printData[T Investor | Account | Order | Trade | Position | OffsetOrder](inter string, data *T) {
+func printData[
+	T rhmonitor4go.Investor | rhmonitor4go.Account |
+		rhmonitor4go.Order | rhmonitor4go.Trade |
+		rhmonitor4go.Position | rhmonitor4go.OffsetOrder,
+](inter string, data *T) {
 	if data != nil {
 		fmt.Printf("%s %s: %+v\n", inter, reflect.TypeOf(data), data)
 	}
 }
 
 type RHRiskApi interface {
-	ReqUserLogin(*RiskUser) (int64, int)
+	ReqUserLogin(*rhmonitor4go.RiskUser) (int64, int)
 	ReqUserLogout() (int64, int)
 	ReqQryMonitorAccounts() (int64, int)
-	ReqQryInvestorMoney(*Investor) (int64, int)
-	ReqQryInvestorPosition(*Investor, string) (int64, int)
-	ReqOffsetOrder(*OffsetOrder) (int64, int)
-	ReqSubPushInfo(*SubInfo) (int64, int)
-	ReqSubInvestorOrder(*Investor) (int64, int)
-	ReqSubInvestorTrade(*Investor) (int64, int)
+	ReqQryInvestorMoney(*rhmonitor4go.Investor) (int64, int)
+	ReqQryInvestorPosition(*rhmonitor4go.Investor, string) (int64, int)
+	ReqOffsetOrder(*rhmonitor4go.OffsetOrder) (int64, int)
+	ReqSubPushInfo(*rhmonitor4go.SubInfo) (int64, int)
+	ReqSubInvestorOrder(*rhmonitor4go.Investor) (int64, int)
+	ReqSubInvestorTrade(*rhmonitor4go.Investor) (int64, int)
 	Release()
 }
 
@@ -65,7 +70,7 @@ type RHMonitorApi struct {
 	brokerID   string
 	remoteAddr net.IP
 	remotePort int
-	riskUser   RiskUser
+	riskUser   rhmonitor4go.RiskUser
 
 	requests  *RequestCache
 	investors *InvestorCache
@@ -88,7 +93,7 @@ func (api *RHMonitorApi) nextRequestID(out *int64) int {
 	return int(old + 1)
 }
 
-func (api *RHMonitorApi) ReqUserLogin(login *RiskUser) (int64, int) {
+func (api *RHMonitorApi) ReqUserLogin(login *rhmonitor4go.RiskUser) (int64, int) {
 	var reqID int64
 
 	if login != nil {
@@ -103,7 +108,7 @@ func (api *RHMonitorApi) ReqUserLogin(login *RiskUser) (int64, int) {
 
 		return int(C.ReqUserLogin(
 			api.cInstance,
-			api.riskUser.ToCRHMonitorReqUserLoginField(),
+			ToCRHMonitorReqUserLoginField(&api.riskUser),
 			C.int(api.nextRequestID(&reqID)),
 		))
 	})
@@ -116,7 +121,7 @@ func (api *RHMonitorApi) ReqUserLogout() (int64, int) {
 
 	return reqID, int(C.ReqUserLogout(
 		api.cInstance,
-		api.riskUser.ToCRHMonitorUserLogoutField(),
+		ToCRHMonitorUserLogoutField(&api.riskUser),
 		C.int(api.nextRequestID(&reqID)),
 	))
 }
@@ -129,13 +134,13 @@ func (api *RHMonitorApi) ReqQryMonitorAccounts() (int64, int) {
 
 		return int(C.ReqQryMonitorAccounts(
 			api.cInstance,
-			api.riskUser.ToCRHMonitorQryMonitorUser(),
+			ToCRHMonitorQryMonitorUser(&api.riskUser),
 			C.int(api.nextRequestID(&reqID)),
 		))
 	})
 }
 
-func (api *RHMonitorApi) ExecReqQryInvestorMoney(investor *Investor) (int64, int) {
+func (api *RHMonitorApi) ExecReqQryInvestorMoney(investor *rhmonitor4go.Investor) (int64, int) {
 	var reqID int64
 
 	api.requests.WaitLogin()
@@ -144,12 +149,12 @@ func (api *RHMonitorApi) ExecReqQryInvestorMoney(investor *Investor) (int64, int
 
 	return reqID, int(C.ReqQryInvestorMoney(
 		api.cInstance,
-		investor.ToCRHMonitorQryInvestorMoneyField(),
+		ToCRHMonitorQryInvestorMoneyField(investor),
 		C.int(api.nextRequestID(&reqID)),
 	))
 }
 
-func (api *RHMonitorApi) ReqQryInvestorMoney(investor *Investor) (int64, int) {
+func (api *RHMonitorApi) ReqQryInvestorMoney(investor *rhmonitor4go.Investor) (int64, int) {
 	var reqID int64
 
 	return reqID, api.requests.WaitLoginAndDo(func() int {
@@ -157,7 +162,7 @@ func (api *RHMonitorApi) ReqQryInvestorMoney(investor *Investor) (int64, int) {
 
 		return int(C.ReqQryInvestorMoney(
 			api.cInstance,
-			investor.ToCRHMonitorQryInvestorMoneyField(),
+			ToCRHMonitorQryInvestorMoneyField(investor),
 			C.int(api.nextRequestID(&reqID)),
 		))
 	})
@@ -167,7 +172,7 @@ func (api *RHMonitorApi) ReqQryAllInvestorMoney() int {
 	return api.requests.WaitInvestorReadyAndDo(func() (rtn int) {
 		log.Printf("Request query all investor's money with cache.")
 
-		api.investors.ForEach(func(_ string, investor *Investor) bool {
+		api.investors.ForEach(func(_ string, investor *rhmonitor4go.Investor) bool {
 			_, rtn = api.ExecReqQryInvestorMoney(investor)
 
 			if rtn != 0 {
@@ -181,7 +186,7 @@ func (api *RHMonitorApi) ReqQryAllInvestorMoney() int {
 	})
 }
 
-func (api *RHMonitorApi) ExecReqQryInvestorPosition(investor *Investor, instrumentID string) (int64, int) {
+func (api *RHMonitorApi) ExecReqQryInvestorPosition(investor *rhmonitor4go.Investor, instrumentID string) (int64, int) {
 	var reqID int64
 
 	api.requests.WaitLogin()
@@ -190,12 +195,12 @@ func (api *RHMonitorApi) ExecReqQryInvestorPosition(investor *Investor, instrume
 
 	return reqID, int(C.ReqQryInvestorPosition(
 		api.cInstance,
-		investor.ToCRHMonitorQryInvestorPositionField(instrumentID),
+		ToCRHMonitorQryInvestorPositionField(investor, instrumentID),
 		C.int(api.nextRequestID(&reqID)),
 	))
 }
 
-func (api *RHMonitorApi) ReqQryInvestorPosition(investor *Investor, instrumentID string) (int64, int) {
+func (api *RHMonitorApi) ReqQryInvestorPosition(investor *rhmonitor4go.Investor, instrumentID string) (int64, int) {
 	var reqID int64
 
 	return reqID, api.requests.WaitLoginAndDo(func() int {
@@ -203,7 +208,7 @@ func (api *RHMonitorApi) ReqQryInvestorPosition(investor *Investor, instrumentID
 
 		return int(C.ReqQryInvestorPosition(
 			api.cInstance,
-			investor.ToCRHMonitorQryInvestorPositionField(instrumentID),
+			ToCRHMonitorQryInvestorPositionField(investor, instrumentID),
 			C.int(api.nextRequestID(&reqID)),
 		))
 	})
@@ -213,7 +218,7 @@ func (api *RHMonitorApi) ReqQryAllInvestorPosition() int {
 	return api.requests.WaitInvestorReadyAndDo(func() (rtn int) {
 		log.Printf("Request query all investor's position with cache.")
 
-		api.investors.ForEach(func(_ string, investor *Investor) bool {
+		api.investors.ForEach(func(_ string, investor *rhmonitor4go.Investor) bool {
 			_, rtn = api.ExecReqQryInvestorPosition(investor, "")
 
 			if rtn != 0 {
@@ -228,12 +233,12 @@ func (api *RHMonitorApi) ReqQryAllInvestorPosition() int {
 	})
 }
 
-func (api *RHMonitorApi) ReqOffsetOrder(offsetOrder *OffsetOrder) (int64, int) {
+func (api *RHMonitorApi) ReqOffsetOrder(offsetOrder *rhmonitor4go.OffsetOrder) (int64, int) {
 	log.Printf("ReqOffsetOrder not implied: %+v", offsetOrder)
 	return -1, -255
 }
 
-func (api *RHMonitorApi) ExecReqSubPushInfo(sub *SubInfo) (int64, int) {
+func (api *RHMonitorApi) ExecReqSubPushInfo(sub *rhmonitor4go.SubInfo) (int64, int) {
 	var reqID int64
 
 	api.requests.WaitLogin()
@@ -242,12 +247,12 @@ func (api *RHMonitorApi) ExecReqSubPushInfo(sub *SubInfo) (int64, int) {
 
 	return reqID, int(C.ReqSubPushInfo(
 		api.cInstance,
-		sub.ToCRHMonitorSubPushInfo(),
+		ToCRHMonitorSubPushInfo(sub),
 		C.int(api.nextRequestID(&reqID)),
 	))
 }
 
-func (api *RHMonitorApi) ReqSubPushInfo(sub *SubInfo) (int64, int) {
+func (api *RHMonitorApi) ReqSubPushInfo(sub *rhmonitor4go.SubInfo) (int64, int) {
 	var reqID int64
 
 	return reqID, api.requests.WaitLoginAndDo(func() int {
@@ -255,28 +260,28 @@ func (api *RHMonitorApi) ReqSubPushInfo(sub *SubInfo) (int64, int) {
 
 		return int(C.ReqSubPushInfo(
 			api.cInstance,
-			sub.ToCRHMonitorSubPushInfo(),
+			ToCRHMonitorSubPushInfo(sub),
 			C.int(api.nextRequestID(&reqID)),
 		))
 	})
 }
 
-func (api *RHMonitorApi) ExecReqSubInvestorOrder(investor *Investor) (int64, int) {
-	sub := SubInfo{}
+func (api *RHMonitorApi) ExecReqSubInvestorOrder(investor *rhmonitor4go.Investor) (int64, int) {
+	sub := rhmonitor4go.SubInfo{}
 	sub.BrokerID = investor.BrokerID
 	sub.InvestorID = investor.InvestorID
-	sub.AccountType = RH_ACCOUNTTYPE_VIRTUAL
-	sub.SubInfoType = RHMonitorSubPushInfoType_Order
+	sub.AccountType = rhmonitor4go.RH_ACCOUNTTYPE_VIRTUAL
+	sub.SubInfoType = rhmonitor4go.RHMonitorSubPushInfoType_Order
 
 	return api.ExecReqSubPushInfo(&sub)
 }
 
-func (api *RHMonitorApi) ReqSubInvestorOrder(investor *Investor) (int64, int) {
-	sub := SubInfo{}
+func (api *RHMonitorApi) ReqSubInvestorOrder(investor *rhmonitor4go.Investor) (int64, int) {
+	sub := rhmonitor4go.SubInfo{}
 	sub.BrokerID = investor.BrokerID
 	sub.InvestorID = investor.InvestorID
-	sub.AccountType = RH_ACCOUNTTYPE_VIRTUAL
-	sub.SubInfoType = RHMonitorSubPushInfoType_Order
+	sub.AccountType = rhmonitor4go.RH_ACCOUNTTYPE_VIRTUAL
+	sub.SubInfoType = rhmonitor4go.RHMonitorSubPushInfoType_Order
 
 	return api.ReqSubPushInfo(&sub)
 }
@@ -285,7 +290,7 @@ func (api *RHMonitorApi) ReqSubAllInvestorOrder() int {
 	return api.requests.WaitInvestorReadyAndDo(func() (rtn int) {
 		log.Printf("Request sub all investor[%d]'s order with cache.", api.investors.Size())
 
-		api.investors.ForEach(func(_ string, investor *Investor) bool {
+		api.investors.ForEach(func(_ string, investor *rhmonitor4go.Investor) bool {
 			_, rtn = api.ExecReqSubInvestorOrder(investor)
 
 			if rtn != 0 {
@@ -301,22 +306,22 @@ func (api *RHMonitorApi) ReqSubAllInvestorOrder() int {
 
 }
 
-func (api *RHMonitorApi) ExecReqSubInvestorTrade(investor *Investor) (int64, int) {
-	sub := SubInfo{}
+func (api *RHMonitorApi) ExecReqSubInvestorTrade(investor *rhmonitor4go.Investor) (int64, int) {
+	sub := rhmonitor4go.SubInfo{}
 	sub.BrokerID = investor.BrokerID
 	sub.InvestorID = investor.InvestorID
-	sub.AccountType = RH_ACCOUNTTYPE_VIRTUAL
-	sub.SubInfoType = RHMonitorSubPushInfoType_Trade
+	sub.AccountType = rhmonitor4go.RH_ACCOUNTTYPE_VIRTUAL
+	sub.SubInfoType = rhmonitor4go.RHMonitorSubPushInfoType_Trade
 
 	return api.ExecReqSubPushInfo(&sub)
 }
 
-func (api *RHMonitorApi) ReqSubInvestorTrade(investor *Investor) (int64, int) {
-	sub := SubInfo{}
+func (api *RHMonitorApi) ReqSubInvestorTrade(investor *rhmonitor4go.Investor) (int64, int) {
+	sub := rhmonitor4go.SubInfo{}
 	sub.BrokerID = investor.BrokerID
 	sub.InvestorID = investor.InvestorID
-	sub.AccountType = RH_ACCOUNTTYPE_VIRTUAL
-	sub.SubInfoType = RHMonitorSubPushInfoType_Trade
+	sub.AccountType = rhmonitor4go.RH_ACCOUNTTYPE_VIRTUAL
+	sub.SubInfoType = rhmonitor4go.RHMonitorSubPushInfoType_Trade
 
 	return api.ReqSubPushInfo(&sub)
 }
@@ -325,7 +330,7 @@ func (api *RHMonitorApi) ReqSubAllInvestorTrade() int {
 	return api.requests.WaitInvestorReadyAndDo(func() (rtn int) {
 		log.Printf("Request sub all investor[%d]'s trade info with cache.", api.investors.Size())
 
-		api.investors.ForEach(func(_ string, investor *Investor) bool {
+		api.investors.ForEach(func(_ string, investor *rhmonitor4go.Investor) bool {
 			_, rtn = api.ExecReqSubInvestorTrade(investor)
 
 			if rtn != 0 {
@@ -359,12 +364,12 @@ func (api *RHMonitorApi) HandleDisconnected() {
 	api.requests.SetConnected(false)
 }
 
-func (api *RHMonitorApi) OnFrontDisconnected(reason Reason) {
+func (api *RHMonitorApi) OnFrontDisconnected(reason rhmonitor4go.Reason) {
 	api.HandleDisconnected()
 	log.Printf("Rohon risk[%s:%d] disconnected: %s", api.remoteAddr, api.remotePort, reason)
 }
 
-func (api *RHMonitorApi) HandleLogin(login *RspUserLogin) {
+func (api *RHMonitorApi) HandleLogin(login *rhmonitor4go.RspUserLogin) {
 	if login != nil {
 		api.requests.SetLogin(true)
 
@@ -376,7 +381,7 @@ func (api *RHMonitorApi) HandleLogin(login *RspUserLogin) {
 	}
 }
 
-func (api *RHMonitorApi) OnRspUserLogin(login *RspUserLogin, info *RspInfo, requestID int64) {
+func (api *RHMonitorApi) OnRspUserLogin(login *rhmonitor4go.RspUserLogin, info *rhmonitor4go.RspInfo, requestID int64) {
 	if err := CheckRspInfo(info); err != nil {
 		log.Printf("User[%s] login failed: %v", api.riskUser.UserID, err)
 		return
@@ -389,7 +394,7 @@ func (api *RHMonitorApi) OnRspUserLogin(login *RspUserLogin, info *RspInfo, requ
 	}
 }
 
-func (api *RHMonitorApi) HandleLogout(logout *RspUserLogout) {
+func (api *RHMonitorApi) HandleLogout(logout *rhmonitor4go.RspUserLogout) {
 	if logout != nil {
 		api.requests.SetLogin(false)
 	} else {
@@ -397,7 +402,7 @@ func (api *RHMonitorApi) HandleLogout(logout *RspUserLogout) {
 	}
 }
 
-func (api *RHMonitorApi) OnRspUserLogout(logout *RspUserLogout, info *RspInfo, requestID int64) {
+func (api *RHMonitorApi) OnRspUserLogout(logout *rhmonitor4go.RspUserLogout, info *rhmonitor4go.RspInfo, requestID int64) {
 	if err := CheckRspInfo(info); err != nil {
 		log.Printf("User logout failed: %v", err)
 		return
@@ -408,7 +413,7 @@ func (api *RHMonitorApi) OnRspUserLogout(logout *RspUserLogout, info *RspInfo, r
 	}
 }
 
-func (api *RHMonitorApi) HandleInvestor(investor *Investor, isLast bool) {
+func (api *RHMonitorApi) HandleInvestor(investor *rhmonitor4go.Investor, isLast bool) {
 	if investor != nil {
 		api.investors.AddInvestor(investor)
 	}
@@ -420,7 +425,7 @@ func (api *RHMonitorApi) HandleInvestor(investor *Investor, isLast bool) {
 	}
 }
 
-func (api *RHMonitorApi) OnRspQryMonitorAccounts(investor *Investor, info *RspInfo, requestID int64, isLast bool) {
+func (api *RHMonitorApi) OnRspQryMonitorAccounts(investor *rhmonitor4go.Investor, info *rhmonitor4go.RspInfo, requestID int64, isLast bool) {
 	if err := CheckRspInfo(info); err != nil {
 		log.Printf("Monitor account query failed: %v", err)
 		return
@@ -431,14 +436,14 @@ func (api *RHMonitorApi) OnRspQryMonitorAccounts(investor *Investor, info *RspIn
 	if isLast {
 		log.Printf("All monitor account query finished: %d", api.investors.Size())
 
-		api.investors.ForEach(func(_ string, investor *Investor) bool {
+		api.investors.ForEach(func(_ string, investor *rhmonitor4go.Investor) bool {
 			printData("OnRspQryMonitorAccounts", investor)
 			return true
 		})
 	}
 }
 
-func (api *RHMonitorApi) OnRspQryInvestorMoney(account *Account, info *RspInfo, requestID int64, isLast bool) {
+func (api *RHMonitorApi) OnRspQryInvestorMoney(account *rhmonitor4go.Account, info *rhmonitor4go.RspInfo, requestID int64, isLast bool) {
 	if err := CheckRspInfo(info); err != nil {
 		log.Printf("Investor money query failed: %v", err)
 		return
@@ -447,7 +452,7 @@ func (api *RHMonitorApi) OnRspQryInvestorMoney(account *Account, info *RspInfo, 
 	printData("OnRspQryInvestorMoney", account)
 }
 
-func (api *RHMonitorApi) OnRspQryInvestorPosition(position *Position, info *RspInfo, requestID int64, isLast bool) {
+func (api *RHMonitorApi) OnRspQryInvestorPosition(position *rhmonitor4go.Position, info *rhmonitor4go.RspInfo, requestID int64, isLast bool) {
 	if err := CheckRspInfo(info); err != nil {
 		log.Printf("Investor position query failed: %v", err)
 
@@ -461,7 +466,7 @@ func (api *RHMonitorApi) OnRspQryInvestorPosition(position *Position, info *RspI
 	}
 }
 
-func (api *RHMonitorApi) OnRspOffsetOrder(offsetOrd *OffsetOrder, info *RspInfo, requestID int64, isLast bool) {
+func (api *RHMonitorApi) OnRspOffsetOrder(offsetOrd *rhmonitor4go.OffsetOrder, info *rhmonitor4go.RspInfo, requestID int64, isLast bool) {
 	if err := CheckRspInfo(info); err != nil {
 		log.Printf(
 			"Offset order[%s %s: %d@%f] for investor[%s] failed: %v",
@@ -476,20 +481,20 @@ func (api *RHMonitorApi) OnRspOffsetOrder(offsetOrd *OffsetOrder, info *RspInfo,
 	printData("OnRspOffsetOrder", offsetOrd)
 }
 
-func (api *RHMonitorApi) OnRtnOrder(order *Order) {
+func (api *RHMonitorApi) OnRtnOrder(order *rhmonitor4go.Order) {
 	printData("OnRtnOrder", order)
 }
 
-func (api *RHMonitorApi) OnRtnTrade(trade *Trade) {
+func (api *RHMonitorApi) OnRtnTrade(trade *rhmonitor4go.Trade) {
 	printData("OnRtnTrade", trade)
 }
 
 // 不进行任何订阅，在进行用户资金查询或其他任何会影响资金变动的操作后，都会推送
-func (api *RHMonitorApi) OnRtnInvestorMoney(account *Account) {
+func (api *RHMonitorApi) OnRtnInvestorMoney(account *rhmonitor4go.Account) {
 	printData("OnRtnInvestorMoney", account)
 }
 
-func (api *RHMonitorApi) OnRtnInvestorPosition(position *Position) {
+func (api *RHMonitorApi) OnRtnInvestorPosition(position *rhmonitor4go.Position) {
 	printData("OnRtnInvestorPosition", position)
 }
 
@@ -510,7 +515,7 @@ func (api *RHMonitorApi) Init(brokerID, addr string, port int, spi RHRiskSpi) er
 		api.remotePort = port
 		api.requests = &RequestCache{}
 		api.investors = &InvestorCache{
-			data: make(map[string]*Investor),
+			data: make(map[string]*rhmonitor4go.Investor),
 		}
 
 		if spi == nil {

@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"encoding/json"
 	"testing"
 
 	rohon "github.com/frozenpine/rhmonitor4go"
@@ -23,6 +24,13 @@ func TestSerial(t *testing.T) {
 	buffer, err := proto_risk_user.Marshal()
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	jsonStr, err := json.Marshal(proto_risk_user)
+	if err != nil {
+		t.Fatal(err)
+	} else {
+		t.Log(jsonStr)
 	}
 
 	t.Log(buffer, len(buffer), len(risk_user.UserID)+len(risk_user.Password)+len(risk_user.MACAddress))

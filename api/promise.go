@@ -1,4 +1,4 @@
-package rhmonitor4go
+package api
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/frozenpine/rhmonitor4go"
 	"github.com/pkg/errors"
 )
 
@@ -73,12 +74,12 @@ type Result[T RHRiskData] interface {
 	IsBatch() bool
 	GetRequestID() int64
 	GetExecCode() int
-	GetRspInfo() *RspInfo
+	GetRspInfo() *rhmonitor4go.RspInfo
 	GetError() error
 	GetData() <-chan *T
 
 	AppendResult(int64, *T, bool)
-	SetRspInfo(int64, *RspInfo)
+	SetRspInfo(int64, *rhmonitor4go.RspInfo)
 }
 
 type baseResult[T RHRiskData] struct {
@@ -135,7 +136,7 @@ func (r *baseResult[T]) Finally(fn CallbackFn[T]) Promise[T] {
 }
 
 type rsp struct {
-	info       *RspInfo
+	info       *rhmonitor4go.RspInfo
 	status     bool
 	notifyFlag chan struct{}
 	notifyOnce sync.Once
@@ -171,14 +172,14 @@ func (r *BatchResult[T]) GetRequestID() int64 {
 	return r.requestIDList[size-1]
 }
 
-func (r *BatchResult[T]) GetRspInfo() *RspInfo {
+func (r *BatchResult[T]) GetRspInfo() *rhmonitor4go.RspInfo {
 	size := len(r.requestIDList)
 
 	if size == 0 {
 		return nil
 	}
 
-	var rsp *RspInfo
+	var rsp *rhmonitor4go.RspInfo
 
 	for _, cache := range r.rspCache {
 		if cache.info != nil && cache.info.ErrorID != 0 {
@@ -225,7 +226,7 @@ func (r *BatchResult[T]) GetError() (err error) {
 	return
 }
 
-func (r *BatchResult[T]) SetRspInfo(reqID int64, rsp *RspInfo) {
+func (r *BatchResult[T]) SetRspInfo(reqID int64, rsp *rhmonitor4go.RspInfo) {
 	if rsp == nil {
 		return
 	}
@@ -365,7 +366,7 @@ type SingleResult[T RHRiskData] struct {
 	promiseErrChain []PromiseError
 	requestID       int64
 	execCode        int
-	rspInfo         *RspInfo
+	rspInfo         *rhmonitor4go.RspInfo
 	notifyFlag      chan struct{}
 	notifyOnce      sync.Once
 }
@@ -378,7 +379,7 @@ func (r *SingleResult[T]) GetRequestID() int64 {
 	return r.requestID
 }
 
-func (r *SingleResult[T]) GetRspInfo() *RspInfo {
+func (r *SingleResult[T]) GetRspInfo() *rhmonitor4go.RspInfo {
 	return r.rspInfo
 }
 
@@ -417,7 +418,7 @@ func (r *SingleResult[T]) AppendResult(reqID int64, v *T, isLast bool) {
 	}
 }
 
-func (r *SingleResult[T]) SetRspInfo(_ int64, rsp *RspInfo) {
+func (r *SingleResult[T]) SetRspInfo(_ int64, rsp *rhmonitor4go.RspInfo) {
 	r.rspInfo = rsp
 }
 

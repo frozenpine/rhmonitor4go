@@ -196,7 +196,7 @@ var (
 	}
 )
 
-func convertRspLogin(login *rohon.RspUserLogin) *RspUserLogin {
+func ConvertRspLogin(login *rohon.RspUserLogin) *RspUserLogin {
 	return &RspUserLogin{
 		UserId:        login.UserID,
 		TradingDay:    login.TradingDay,
@@ -206,20 +206,20 @@ func convertRspLogin(login *rohon.RspUserLogin) *RspUserLogin {
 	}
 }
 
-func convertRspLogout(logout *rohon.RspUserLogout) *RspUserLogout {
+func ConvertRspLogout(logout *rohon.RspUserLogout) *RspUserLogout {
 	return &RspUserLogout{
 		UserId: logout.UserID,
 	}
 }
 
-func convertInvestor(inv *rohon.Investor) *Investor {
+func ConvertInvestor(inv *rohon.Investor) *Investor {
 	return &Investor{
 		BrokerId:   inv.BrokerID,
 		InvestorId: inv.InvestorID,
 	}
 }
 
-func convertOrder(ord *rohon.Order) *Order {
+func ConvertOrder(ord *rohon.Order) *Order {
 	return &Order{
 		Investor: &Investor{
 			BrokerId:   ord.BrokerID,
@@ -285,7 +285,7 @@ func convertOrder(ord *rohon.Order) *Order {
 	}
 }
 
-func convertTrade(td *rohon.Trade) *Trade {
+func ConvertTrade(td *rohon.Trade) *Trade {
 	return &Trade{
 		Investor: &Investor{
 			BrokerId:   td.BrokerID,
@@ -323,7 +323,7 @@ func convertTrade(td *rohon.Trade) *Trade {
 	}
 }
 
-func convertPosition(pos *rohon.Position) *Position {
+func ConvertPosition(pos *rohon.Position) *Position {
 	return &Position{
 		Investor: &Investor{
 			BrokerId:   pos.BrokerID,
@@ -343,7 +343,7 @@ func convertPosition(pos *rohon.Position) *Position {
 	}
 }
 
-func convertAccount(acct *rohon.Account) *Account {
+func ConvertAccount(acct *rohon.Account) *Account {
 	return &Account{
 		Investor: &Investor{
 			BrokerId:   acct.BrokerID,

@@ -1,4 +1,4 @@
-package rhmonitor4go
+package api
 
 /*
 #cgo CFLAGS: -I${SRCDIR}/include
@@ -83,6 +83,7 @@ void cgoOnRtnInvestorPosition
 import "C"
 
 import (
+	"github.com/frozenpine/rhmonitor4go"
 	"github.com/pkg/errors"
 )
 
@@ -109,17 +110,17 @@ var (
 
 type RHRiskSpi interface {
 	OnFrontConnected()
-	OnFrontDisconnected(reason Reason)
-	OnRspUserLogin(*RspUserLogin, *RspInfo, int64)
-	OnRspUserLogout(*RspUserLogout, *RspInfo, int64)
-	OnRspQryMonitorAccounts(*Investor, *RspInfo, int64, bool)
-	OnRspQryInvestorMoney(*Account, *RspInfo, int64, bool)
-	OnRspQryInvestorPosition(*Position, *RspInfo, int64, bool)
-	OnRspOffsetOrder(*OffsetOrder, *RspInfo, int64, bool)
-	OnRtnOrder(*Order)
-	OnRtnTrade(*Trade)
-	OnRtnInvestorMoney(*Account)
-	OnRtnInvestorPosition(*Position)
+	OnFrontDisconnected(reason rhmonitor4go.Reason)
+	OnRspUserLogin(*rhmonitor4go.RspUserLogin, *rhmonitor4go.RspInfo, int64)
+	OnRspUserLogout(*rhmonitor4go.RspUserLogout, *rhmonitor4go.RspInfo, int64)
+	OnRspQryMonitorAccounts(*rhmonitor4go.Investor, *rhmonitor4go.RspInfo, int64, bool)
+	OnRspQryInvestorMoney(*rhmonitor4go.Account, *rhmonitor4go.RspInfo, int64, bool)
+	OnRspQryInvestorPosition(*rhmonitor4go.Position, *rhmonitor4go.RspInfo, int64, bool)
+	OnRspOffsetOrder(*rhmonitor4go.OffsetOrder, *rhmonitor4go.RspInfo, int64, bool)
+	OnRtnOrder(*rhmonitor4go.Order)
+	OnRtnTrade(*rhmonitor4go.Trade)
+	OnRtnInvestorMoney(*rhmonitor4go.Account)
+	OnRtnInvestorPosition(*rhmonitor4go.Position)
 }
 
 func getSpiInstance(instance C.CRHMonitorInstance) (api RHRiskSpi) {
@@ -139,7 +140,7 @@ func cgoOnFrontConnected(instance C.CRHMonitorInstance) {
 
 //export cgoOnFrontDisconnected
 func cgoOnFrontDisconnected(instance C.CRHMonitorInstance, nReason C.int) {
-	getSpiInstance(instance).OnFrontDisconnected(Reason(nReason))
+	getSpiInstance(instance).OnFrontDisconnected(rhmonitor4go.Reason(nReason))
 }
 
 //export cgoOnRspUserLogin

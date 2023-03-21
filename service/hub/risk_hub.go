@@ -1,4 +1,4 @@
-package service
+package hub
 
 import (
 	"context"
@@ -9,6 +9,8 @@ import (
 	"time"
 
 	rohon "github.com/frozenpine/rhmonitor4go"
+	rhapi "github.com/frozenpine/rhmonitor4go/api"
+	"github.com/frozenpine/rhmonitor4go/service"
 	"github.com/gofrs/uuid"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
@@ -24,10 +26,10 @@ var (
 const broadcastBufferSize = 10
 
 type grpcRiskApi struct {
-	rohon.AsyncRHMonitorApi
+	rhapi.AsyncRHMonitorApi
 
 	ctx             context.Context
-	front           *RiskServer
+	front           *service.RiskServer
 	broadcastSub    atomic.Bool
 	broadcastCh     chan string
 	broadcastLock   sync.RWMutex
@@ -72,12 +74,12 @@ func (api *grpcRiskApi) OnFrontDisconnected(reason rohon.Reason) {
 	))
 }
 
-func reqFinalFn[T rohon.RHRiskData](result *Result) rohon.CallbackFn[T] {
-	return func(req rohon.Result[T]) error {
+func reqFinalFn[T rhapi.RHRiskData](result *service.Result) rhapi.CallbackFn[T] {
+	return func(req rhapi.Result[T]) error {
 		result.ReqId = int32(req.GetRequestID())
 
 		if rsp := req.GetRspInfo(); rsp != nil {
-			result.RspInfo = &RspInfo{
+			result.RspInfo = &service.RspInfo{
 				ErrorId:  int32(rsp.ErrorID),
 				ErrorMsg: rsp.ErrorMsg,
 			}
@@ -86,12 +88,12 @@ func reqFinalFn[T rohon.RHRiskData](result *Result) rohon.CallbackFn[T] {
 	}
 }
 
-func checkPromise[T rohon.RHRiskData](result rohon.Result[T], caller string) (rohon.Promise[T], error) {
+func checkPromise[T rhapi.RHRiskData](result rhapi.Result[T], caller string) (rhapi.Promise[T], error) {
 	return result, result.GetError()
 }
 
 type RiskHub struct {
-	UnimplementedRohonMonitorServer
+	service.UnimplementedRohonMonitorServer
 
 	svr           *grpc.Server
 	apiCache      sync.Map
@@ -109,7 +111,7 @@ func (hub *RiskHub) getApiInstance(idt string) (*grpcRiskApi, error) {
 	)
 }
 
-func (hub *RiskHub) Init(ctx context.Context, req *Request) (result *Result, err error) {
+func (hub *RiskHub) Init(ctx context.Context, req *service.Request) (result *service.Result, err error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -144,18 +146,18 @@ func (hub *RiskHub) Init(ctx context.Context, req *Request) (result *Result, err
 
 	identity := id.String()
 
-	result = &Result{}
+	result = &service.Result{}
 
 	hub.apiCache.Store(identity, &api)
 	result.ReqId = -1
-	result.Response = &Result_ApiIdentity{ApiIdentity: identity}
+	result.Response = &service.Result_ApiIdentity{ApiIdentity: identity}
 
 	log.Printf("New risk api created: %s", id)
 
 	return
 }
 
-func (hub *RiskHub) Release(ctx context.Context, req *Request) (empty *emptypb.Empty, err error) {
+func (hub *RiskHub) Release(ctx context.Context, req *service.Request) (empty *emptypb.Empty, err error) {
 	var api *grpcRiskApi
 	if api, err = hub.getApiInstance(req.GetApiIdentity()); err != nil {
 		return
@@ -170,13 +172,13 @@ func (hub *RiskHub) Release(ctx context.Context, req *Request) (empty *emptypb.E
 	return
 }
 
-func (hub *RiskHub) ReqUserLogin(ctx context.Context, req *Request) (result *Result, err error) {
+func (hub *RiskHub) ReqUserLogin(ctx context.Context, req *service.Request) (result *service.Result, err error) {
 	var api *grpcRiskApi
 	if api, err = hub.getApiInstance(req.GetApiIdentity()); err != nil {
 		return
 	}
 
-	var promise rohon.Promise[rohon.RspUserLogin]
+	var promise rhapi.Promise[rohon.RspUserLogin]
 
 	if promise, err = checkPromise(
 		api.AsyncReqUserLogin(&rohon.RiskUser{
@@ -188,13 +190,13 @@ func (hub *RiskHub) ReqUserLogin(ctx context.Context, req *Request) (result *Res
 		return
 	}
 
-	result = &Result{}
+	result = &service.Result{}
 
-	if err = promise.Then(func(r rohon.Result[rohon.RspUserLogin]) error {
+	if err = promise.Then(func(r rhapi.Result[rohon.RspUserLogin]) error {
 		login := <-r.GetData()
 
-		result.Response = &Result_UserLogin{
-			UserLogin: convertRspLogin(login),
+		result.Response = &service.Result_UserLogin{
+			UserLogin: service.ConvertRspLogin(login),
 		}
 
 		return nil
@@ -207,13 +209,13 @@ func (hub *RiskHub) ReqUserLogin(ctx context.Context, req *Request) (result *Res
 	return
 }
 
-func (hub *RiskHub) ReqUserLogout(ctx context.Context, req *Request) (result *Result, err error) {
+func (hub *RiskHub) ReqUserLogout(ctx context.Context, req *service.Request) (result *service.Result, err error) {
 	var api *grpcRiskApi
 	if api, err = hub.getApiInstance(req.GetApiIdentity()); err != nil {
 		return
 	}
 
-	var promise rohon.Promise[rohon.RspUserLogout]
+	var promise rhapi.Promise[rohon.RspUserLogout]
 	if promise, err = checkPromise(
 		api.AsyncReqUserLogout(),
 		"ReqUserLogout",
@@ -221,13 +223,13 @@ func (hub *RiskHub) ReqUserLogout(ctx context.Context, req *Request) (result *Re
 		return
 	}
 
-	result = &Result{}
+	result = &service.Result{}
 
-	if err = promise.Then(func(r rohon.Result[rohon.RspUserLogout]) error {
+	if err = promise.Then(func(r rhapi.Result[rohon.RspUserLogout]) error {
 		logout := <-r.GetData()
 
-		result.Response = &Result_UserLogout{
-			UserLogout: convertRspLogout(logout),
+		result.Response = &service.Result_UserLogout{
+			UserLogout: service.ConvertRspLogout(logout),
 		}
 
 		return nil
@@ -240,13 +242,13 @@ func (hub *RiskHub) ReqUserLogout(ctx context.Context, req *Request) (result *Re
 	return
 }
 
-func (hub *RiskHub) ReqQryMonitorAccounts(ctx context.Context, req *Request) (result *Result, err error) {
+func (hub *RiskHub) ReqQryMonitorAccounts(ctx context.Context, req *service.Request) (result *service.Result, err error) {
 	var api *grpcRiskApi
 	if api, err = hub.getApiInstance(req.GetApiIdentity()); err != nil {
 		return
 	}
 
-	var promise rohon.Promise[rohon.Investor]
+	var promise rhapi.Promise[rohon.Investor]
 	if promise, err = checkPromise(
 		api.AsyncReqQryMonitorAccounts(),
 		"ReqQryMonitorAccounts",
@@ -254,16 +256,16 @@ func (hub *RiskHub) ReqQryMonitorAccounts(ctx context.Context, req *Request) (re
 		return
 	}
 
-	result = &Result{}
+	result = &service.Result{}
 
-	if err = promise.Then(func(r rohon.Result[rohon.Investor]) error {
-		investors := InvestorList{}
+	if err = promise.Then(func(r rhapi.Result[rohon.Investor]) error {
+		investors := service.InvestorList{}
 
 		for inv := range r.GetData() {
-			investors.Data = append(investors.Data, convertInvestor(inv))
+			investors.Data = append(investors.Data, service.ConvertInvestor(inv))
 		}
 
-		result.Response = &Result_Investors{
+		result.Response = &service.Result_Investors{
 			Investors: &investors,
 		}
 
@@ -277,13 +279,13 @@ func (hub *RiskHub) ReqQryMonitorAccounts(ctx context.Context, req *Request) (re
 	return
 }
 
-func (hub *RiskHub) ReqQryInvestorMoney(ctx context.Context, req *Request) (result *Result, err error) {
+func (hub *RiskHub) ReqQryInvestorMoney(ctx context.Context, req *service.Request) (result *service.Result, err error) {
 	var api *grpcRiskApi
 	if api, err = hub.getApiInstance(req.GetApiIdentity()); err != nil {
 		return
 	}
 
-	var promise rohon.Promise[rohon.Account]
+	var promise rhapi.Promise[rohon.Account]
 
 	if inv := req.GetInvestor(); inv != nil {
 		investor := &rohon.Investor{
@@ -306,16 +308,16 @@ func (hub *RiskHub) ReqQryInvestorMoney(ctx context.Context, req *Request) (resu
 		}
 	}
 
-	result = &Result{}
+	result = &service.Result{}
 
-	if err = promise.Then(func(r rohon.Result[rohon.Account]) error {
-		accounts := &AccountList{}
+	if err = promise.Then(func(r rhapi.Result[rohon.Account]) error {
+		accounts := &service.AccountList{}
 
 		for acct := range r.GetData() {
-			accounts.Data = append(accounts.Data, convertAccount(acct))
+			accounts.Data = append(accounts.Data, service.ConvertAccount(acct))
 		}
 
-		result.Response = &Result_Accounts{Accounts: accounts}
+		result.Response = &service.Result_Accounts{Accounts: accounts}
 
 		return nil
 	}).Finally(
@@ -327,13 +329,13 @@ func (hub *RiskHub) ReqQryInvestorMoney(ctx context.Context, req *Request) (resu
 	return
 }
 
-func (hub *RiskHub) SubInvestorOrder(req *Request, stream RohonMonitor_SubInvestorOrderServer) (err error) {
+func (hub *RiskHub) SubInvestorOrder(req *service.Request, stream service.RohonMonitor_SubInvestorOrderServer) (err error) {
 	var api *grpcRiskApi
 	if api, err = hub.getApiInstance(req.GetApiIdentity()); err != nil {
 		return
 	}
 
-	var result rohon.Result[rohon.Order]
+	var result rhapi.Result[rohon.Order]
 
 	if inv := req.GetInvestor(); inv != nil {
 		result = api.AsyncReqSubInvestorOrder(&rohon.Investor{
@@ -351,19 +353,19 @@ func (hub *RiskHub) SubInvestorOrder(req *Request, stream RohonMonitor_SubInvest
 	}
 
 	for ord := range result.GetData() {
-		stream.Send(convertOrder(ord))
+		stream.Send(service.ConvertOrder(ord))
 	}
 
 	return
 }
 
-func (hub *RiskHub) SubInvestorTrade(req *Request, stream RohonMonitor_SubInvestorTradeServer) (err error) {
+func (hub *RiskHub) SubInvestorTrade(req *service.Request, stream service.RohonMonitor_SubInvestorTradeServer) (err error) {
 	var api *grpcRiskApi
 	if api, err = hub.getApiInstance(req.GetApiIdentity()); err != nil {
 		return
 	}
 
-	var result rohon.Result[rohon.Trade]
+	var result rhapi.Result[rohon.Trade]
 
 	if inv := req.GetInvestor(); inv != nil {
 		result = api.AsyncReqSubInvestorTrade(&rohon.Investor{
@@ -381,13 +383,13 @@ func (hub *RiskHub) SubInvestorTrade(req *Request, stream RohonMonitor_SubInvest
 	}
 
 	for td := range result.GetData() {
-		stream.Send(convertTrade(td))
+		stream.Send(service.ConvertTrade(td))
 	}
 
 	return
 }
 
-func (hub *RiskHub) SubInvestorMoney(req *Request, stream RohonMonitor_SubInvestorMoneyServer) (err error) {
+func (hub *RiskHub) SubInvestorMoney(req *service.Request, stream service.RohonMonitor_SubInvestorMoneyServer) (err error) {
 	var api *grpcRiskApi
 	if api, err = hub.getApiInstance(req.GetApiIdentity()); err != nil {
 		return
@@ -408,19 +410,19 @@ func (hub *RiskHub) SubInvestorMoney(req *Request, stream RohonMonitor_SubInvest
 			continue
 		}
 
-		stream.Send(convertAccount(acct))
+		stream.Send(service.ConvertAccount(acct))
 	}
 
 	return
 }
 
-func (hub *RiskHub) SubInvestorPosition(req *Request, stream RohonMonitor_SubInvestorPositionServer) (err error) {
+func (hub *RiskHub) SubInvestorPosition(req *service.Request, stream service.RohonMonitor_SubInvestorPositionServer) (err error) {
 	var api *grpcRiskApi
 	if api, err = hub.getApiInstance(req.GetApiIdentity()); err != nil {
 		return
 	}
 
-	var result rohon.Result[rohon.Position]
+	var result rhapi.Result[rohon.Position]
 
 	if inv := req.GetInvestor(); inv != nil {
 		result = api.AsyncReqQryInvestorPosition(&rohon.Investor{
@@ -438,13 +440,13 @@ func (hub *RiskHub) SubInvestorPosition(req *Request, stream RohonMonitor_SubInv
 	}
 
 	for pos := range result.GetData() {
-		stream.Send(convertPosition(pos))
+		stream.Send(service.ConvertPosition(pos))
 	}
 
 	return
 }
 
-func (hub *RiskHub) SubBroadcast(req *Request, stream RohonMonitor_SubBroadcastServer) (err error) {
+func (hub *RiskHub) SubBroadcast(req *service.Request, stream service.RohonMonitor_SubBroadcastServer) (err error) {
 	var api *grpcRiskApi
 	if api, err = hub.getApiInstance(req.GetApiIdentity()); err != nil {
 		return
@@ -465,18 +467,18 @@ func (hub *RiskHub) SubBroadcast(req *Request, stream RohonMonitor_SubBroadcastS
 	// }
 
 	for msg := range api.broadcastCh {
-		stream.Send(&Broadcast{Message: msg})
+		stream.Send(&service.Broadcast{Message: msg})
 	}
 
 	return
 }
 
-func NewRohonMonitorHub(svr *grpc.Server) RohonMonitorServer {
+func NewRohonMonitorHub(svr *grpc.Server) service.RohonMonitorServer {
 	pb := &RiskHub{
 		svr: svr,
 	}
 
-	RegisterRohonMonitorServer(svr, pb)
+	service.RegisterRohonMonitorServer(svr, pb)
 
 	// reflection.Register(svr)
 

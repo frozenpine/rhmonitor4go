@@ -9,6 +9,8 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"regexp"
+	"strconv"
 	"time"
 
 	"github.com/frozenpine/rhmonitor4go/service"
@@ -17,12 +19,14 @@ import (
 )
 
 var (
-	rpcAddr    = ""
-	rpcPort    = 1234
-	clientCert = "rhmonitor.crt"
-	clientKey  = "rhmonitor.key"
-	ca         = "ca.crt"
-	timeout    = 5
+	rpcAddr     = ""
+	rpcPort     = 1234
+	clientCert  = "rhmonitor.crt"
+	clientKey   = "rhmonitor.key"
+	ca          = "ca.crt"
+	timeout     = 5
+	riskSvr     = ""
+	riskSvrConn = regexp.MustCompile("tcp://([0-9.]+):([0-9]+)")
 )
 
 func init() {
@@ -34,12 +38,20 @@ func init() {
 	flag.StringVar(&clientKey, "key", clientKey, "gRPC client cert key path")
 	flag.StringVar(&ca, "ca", ca, "gRPC server cert CA path")
 	flag.IntVar(&timeout, "timeout", timeout, "gRPC call deadline in second")
+	flag.StringVar(&riskSvr, "svr", riskSvr, "Rohon risk server conn in format: tcp://{addr}:{port}")
 }
 
 func main() {
 	if !flag.Parsed() {
 		flag.Parse()
 	}
+
+	match := riskSvrConn.FindStringSubmatch(riskSvr)
+	if len(match) != 2 {
+		log.Fatalf("Invalid risk server conn: %s", riskSvr)
+	}
+	riskSvrAddr := match[0]
+	riskSvrPort, _ := strconv.Atoi(match[1])
 
 	log.Printf("Loading gRPC client cert pair")
 	cert, err := tls.LoadX509KeyPair(clientCert, clientKey)
@@ -104,8 +116,8 @@ func main() {
 	if result, err = client.Init(deadline, &service.Request{
 		Request: &service.Request_Front{
 			Front: &service.RiskServer{
-				ServerAddr: "210.22.96.58",
-				ServerPort: 11102,
+				ServerAddr: riskSvrAddr,
+				ServerPort: int32(riskSvrPort),
 			},
 		},
 	}); err != nil {
