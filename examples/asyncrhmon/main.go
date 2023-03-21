@@ -9,6 +9,7 @@ import (
 	"time"
 
 	rohon "github.com/frozenpine/rhmonitor4go"
+	rhapi "github.com/frozenpine/rhmonitor4go/api"
 )
 
 var (
@@ -27,7 +28,7 @@ func init() {
 }
 
 func main() {
-	api := rohon.NewAsyncRHMonitorApi(brokerID, remoteAddr, remotePort)
+	api := rhapi.NewAsyncRHMonitorApi(brokerID, remoteAddr, remotePort)
 
 	ctx := context.Background()
 	signal.NotifyContext(ctx, os.Interrupt, os.Kill)
@@ -41,7 +42,7 @@ func main() {
 	var timeout = time.Second * 10
 
 	if err = api.AsyncReqUserLogin(&login).Then(
-		func(r rohon.Result[rohon.RspUserLogin]) error {
+		func(r rhapi.Result[rohon.RspUserLogin]) error {
 			login := <-r.GetData()
 
 			log.Printf("Risk user logged in: %+v", login)
@@ -50,12 +51,12 @@ func main() {
 			return nil
 		},
 	).Catch(
-		func(r rohon.Result[rohon.RspUserLogin]) error {
+		func(r rhapi.Result[rohon.RspUserLogin]) error {
 			log.Print("test Catch called.")
 			return nil
 		},
 	).Finally(
-		func(r rohon.Result[rohon.RspUserLogin]) error {
+		func(r rhapi.Result[rohon.RspUserLogin]) error {
 			log.Print("test Final called.")
 			return nil
 		},
@@ -64,7 +65,7 @@ func main() {
 	}
 
 	if err = api.AsyncReqQryMonitorAccounts().Then(
-		func(r rohon.Result[rohon.Investor]) error {
+		func(r rhapi.Result[rohon.Investor]) error {
 			for inv := range r.GetData() {
 				fmt.Printf("AsyncOnRspQryMonitorAccounts: %+v\n", inv)
 			}
@@ -75,7 +76,7 @@ func main() {
 	}
 
 	if err = api.AsyncReqQryAllInvestorMoney().Then(
-		func(r rohon.Result[rohon.Account]) error {
+		func(r rhapi.Result[rohon.Account]) error {
 			for acct := range r.GetData() {
 				fmt.Printf("AsyncOnRspQryInvestorMoney: %+v\n", acct)
 			}
@@ -86,7 +87,7 @@ func main() {
 	}
 
 	if err = api.AsyncReqSubAllInvestorMoney().Then(
-		func(r rohon.Result[rohon.Account]) error {
+		func(r rhapi.Result[rohon.Account]) error {
 			for acct := range r.GetData() {
 				fmt.Printf("AsyncOnRtnInvestorMoney: %+v\n", acct)
 			}
