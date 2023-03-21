@@ -23,19 +23,20 @@ import (
 )
 
 var (
-	rpcAddr     = ""
-	rpcPort     = 1234
-	clientCert  = "riskclient.crt"
-	clientKey   = "riskclient.key"
-	ca          = "ca.crt"
-	timeout     = 5
-	riskSvr     = ""
-	riskSvrConn = regexp.MustCompile("tcp://([0-9.]+):([0-9]+)")
-	redisSvr    = "localhost:6379"
-	redisPass   = ""
-	redisDB     = 2
-	redisChan   = "rohon.risk.accounts"
-	redisFormat = msgProto3
+	rpcAddr    = ""
+	rpcPort    = 1234
+	clientCert = "riskclient.crt"
+	clientKey  = "riskclient.key"
+	ca         = "ca.crt"
+	timeout    = 5
+
+	riskSvr        = ""
+	riskSvrPattern = regexp.MustCompile("tcp://([0-9.]+):([0-9]+)")
+
+	redisSvr        = "localhost:6379@2"
+	redisSvrPattern = regexp.MustCompile("(?:(.+)#)?([a-z0-9A-Z.:].+)@([0-9]+)")
+	redisChan       = "rohon.risk.accounts"
+	redisFormat     = msgProto3
 )
 
 type msgFormat uint8
@@ -83,10 +84,10 @@ func init() {
 	flag.StringVar(&clientKey, "key", clientKey, "gRPC client cert key path")
 	flag.StringVar(&ca, "ca", ca, "gRPC server cert CA path")
 	flag.IntVar(&timeout, "timeout", timeout, "gRPC call deadline in second")
+
 	flag.StringVar(&riskSvr, "svr", riskSvr, "Rohon risk server conn in format: tcp://{addr}:{port}")
-	flag.StringVar(&redisSvr, "redis", redisSvr, "Redis server conn in format: {addr}:{port}")
-	flag.StringVar(&redisPass, "pass", redisPass, "Redis server conn pass")
-	flag.IntVar(&redisDB, "db", redisDB, "Redis server db")
+
+	flag.StringVar(&redisSvr, "redis", redisSvr, "Redis server conn in format: ({pass}#)?{addr}:{port}@{db}")
 	flag.StringVar(&redisChan, "chan", redisChan, "Redis publish base channel")
 	flag.Var(&redisFormat, "format", "Redis message marshal format")
 }
@@ -96,12 +97,20 @@ func main() {
 		flag.Parse()
 	}
 
-	match := riskSvrConn.FindStringSubmatch(riskSvr)
+	match := riskSvrPattern.FindStringSubmatch(riskSvr)
 	if len(match) != 3 {
 		log.Fatalf("Invalid risk server conn: %s", riskSvr)
 	}
 	riskSvrAddr := match[1]
 	riskSvrPort, _ := strconv.Atoi(match[2])
+
+	match = redisSvrPattern.FindStringSubmatch(redisSvr)
+	if len(match) != 4 {
+		log.Fatalf("Invalid redis server conn: %s", redisSvr)
+	}
+	redisSvrAddr := match[2]
+	redisSvrPass := match[1]
+	redisDB, _ := strconv.Atoi(match[3])
 
 	log.Printf("Loading gRPC client cert pair")
 	cert, err := tls.LoadX509KeyPair(clientCert, clientKey)
@@ -152,8 +161,8 @@ func main() {
 	}()
 
 	rdb := redis.NewClient(&redis.Options{
-		Addr:     redisSvr,
-		Password: redisPass,
+		Addr:     redisSvrAddr,
+		Password: redisSvrPass,
 		DB:       redisDB,
 	})
 
