@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -11,9 +12,11 @@ import (
 	"os/signal"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/frozenpine/rhmonitor4go/service"
+	"github.com/go-redis/redis/v8"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
@@ -27,6 +30,10 @@ var (
 	timeout     = 5
 	riskSvr     = ""
 	riskSvrConn = regexp.MustCompile("tcp://([0-9.]+):([0-9]+)")
+	redisSvr    = "localhost:6379"
+	redisPass   = ""
+	redisDB     = 2
+	redisChan   = "rohon.risk.accounts"
 )
 
 func init() {
@@ -39,6 +46,10 @@ func init() {
 	flag.StringVar(&ca, "ca", ca, "gRPC server cert CA path")
 	flag.IntVar(&timeout, "timeout", timeout, "gRPC call deadline in second")
 	flag.StringVar(&riskSvr, "svr", riskSvr, "Rohon risk server conn in format: tcp://{addr}:{port}")
+	flag.StringVar(&redisSvr, "redis", redisSvr, "Redis server conn in format: {addr}:{port}")
+	flag.StringVar(&redisPass, "pass", redisPass, "Redis server conn pass")
+	flag.IntVar(&redisDB, "db", redisDB, "Redis server db")
+	flag.StringVar(&redisChan, "chan", redisChan, "Redis publish channel")
 }
 
 func main() {
@@ -101,7 +112,12 @@ func main() {
 		}
 	}()
 
-	// cli := CLI{}
+	rdb := redis.NewClient(&redis.Options{
+		Addr:     redisSvr,
+		Password: redisPass,
+		DB:       redisDB,
+	})
+
 	client := service.NewRohonMonitorClient(conn)
 
 	var (
@@ -200,6 +216,8 @@ func main() {
 		log.Fatalf("Subscribe investor's account failed: %+v", err)
 	}
 
+	pubChan := []string{redisChan, ""}
+
 	for {
 		acct, err := stream.Recv()
 
@@ -209,6 +227,22 @@ func main() {
 		}
 
 		fmt.Printf("OnRtnInvestorMoney %+v\n", acct)
+
+		pubChan[1] = acct.Investor.InvestorId
+		buffer, err := json.Marshal(acct)
+		if err != nil {
+			log.Printf("Marshal account message failed: %s", err)
+			continue
+		}
+
+		cmd := rdb.Publish(ctx, strings.Join(pubChan, "."), buffer)
+
+		if err = cmd.Err(); err != nil {
+			log.Printf(
+				"Publish to redis[%s@%d] faield: %s",
+				redisSvr, redisDB, err,
+			)
+		}
 	}
 
 	// log.Printf("Starting gRPC client")
