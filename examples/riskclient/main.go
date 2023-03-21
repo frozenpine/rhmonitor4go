@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -24,8 +25,8 @@ import (
 var (
 	rpcAddr     = ""
 	rpcPort     = 1234
-	clientCert  = "rhmonitor.crt"
-	clientKey   = "rhmonitor.key"
+	clientCert  = "riskclient.crt"
+	clientKey   = "riskclient.key"
 	ca          = "ca.crt"
 	timeout     = 5
 	riskSvr     = ""
@@ -34,6 +35,43 @@ var (
 	redisPass   = ""
 	redisDB     = 2
 	redisChan   = "rohon.risk.accounts"
+	redisFormat = msgProto3
+)
+
+type msgFormat uint8
+
+func (msgFmt *msgFormat) String() string {
+	switch *msgFmt {
+	case msgProto3:
+		return "proto3"
+	case msgJson:
+		return "json"
+	case msgPack:
+		return "msgpack"
+	default:
+		return "unknown"
+	}
+}
+
+func (msgFmt *msgFormat) Set(value string) error {
+	switch value {
+	case "proto3":
+		*msgFmt = msgProto3
+	case "json":
+		*msgFmt = msgJson
+	case "msgpack":
+		*msgFmt = msgPack
+	default:
+		return errors.New("invalid msg format")
+	}
+
+	return nil
+}
+
+const (
+	msgProto3 msgFormat = iota
+	msgJson
+	msgPack
 )
 
 func init() {
@@ -49,7 +87,8 @@ func init() {
 	flag.StringVar(&redisSvr, "redis", redisSvr, "Redis server conn in format: {addr}:{port}")
 	flag.StringVar(&redisPass, "pass", redisPass, "Redis server conn pass")
 	flag.IntVar(&redisDB, "db", redisDB, "Redis server db")
-	flag.StringVar(&redisChan, "chan", redisChan, "Redis publish channel")
+	flag.StringVar(&redisChan, "chan", redisChan, "Redis publish base channel")
+	flag.Var(&redisFormat, "format", "Redis message marshal format")
 }
 
 func main() {
@@ -217,6 +256,7 @@ func main() {
 	}
 
 	pubChan := []string{redisChan, ""}
+	var buffer []byte
 
 	for {
 		acct, err := stream.Recv()
@@ -229,7 +269,16 @@ func main() {
 		fmt.Printf("OnRtnInvestorMoney %+v\n", acct)
 
 		pubChan[1] = acct.Investor.InvestorId
-		buffer, err := json.Marshal(acct)
+
+		switch redisFormat {
+		case msgProto3:
+			buffer, err = acct.Marshal()
+		case msgJson:
+			buffer, err = json.Marshal(acct)
+		default:
+			log.Fatal("Unsupported message format: ", redisFormat)
+		}
+
 		if err != nil {
 			log.Printf("Marshal account message failed: %s", err)
 			continue
