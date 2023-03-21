@@ -47,11 +47,11 @@ func main() {
 	}
 
 	match := riskSvrConn.FindStringSubmatch(riskSvr)
-	if len(match) != 2 {
+	if len(match) != 3 {
 		log.Fatalf("Invalid risk server conn: %s", riskSvr)
 	}
-	riskSvrAddr := match[0]
-	riskSvrPort, _ := strconv.Atoi(match[1])
+	riskSvrAddr := match[1]
+	riskSvrPort, _ := strconv.Atoi(match[2])
 
 	log.Printf("Loading gRPC client cert pair")
 	cert, err := tls.LoadX509KeyPair(clientCert, clientKey)
@@ -208,7 +208,7 @@ func main() {
 			break
 		}
 
-		fmt.Printf("OnRtnInvestorMoney %+v", acct)
+		fmt.Printf("OnRtnInvestorMoney %+v\n", acct)
 	}
 
 	// log.Printf("Starting gRPC client")
