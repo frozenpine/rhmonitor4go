@@ -7,6 +7,7 @@ import (
 	"os/signal"
 
 	rohon "github.com/frozenpine/rhmonitor4go"
+	rhapi "github.com/frozenpine/rhmonitor4go/api"
 )
 
 var (
@@ -28,7 +29,7 @@ func init() {
 // connected, disconnected, login, logout, investor events
 // must call event handler to process flags
 type myApi struct {
-	rohon.RHMonitorApi
+	rhapi.RHMonitorApi
 }
 
 func (api *myApi) OnFrontConnected() {
