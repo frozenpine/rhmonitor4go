@@ -85,6 +85,7 @@ message Account {
   double dynamic_money = 37;
   double premium = 38;
   double market_value_equity = 39;
+  int64 timestamp = 40;
 }
 
 enum HedgeFlag {

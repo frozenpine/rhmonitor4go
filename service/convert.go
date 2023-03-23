@@ -1,6 +1,10 @@
 package service
 
-import rohon "github.com/frozenpine/rhmonitor4go"
+import (
+	"time"
+
+	rohon "github.com/frozenpine/rhmonitor4go"
+)
 
 var (
 	privilegeMap = map[rohon.PrivilegeType]PrivilegeType{
@@ -405,5 +409,6 @@ func ConvertAccount(acct *rohon.Account) *Account {
 		DynamicMoney:      acct.DynamicMoney,
 		Premium:           acct.Premium,
 		MarketValueEquity: acct.MarketValueEquity,
+		Timestamp:         time.Now().UnixMicro(),
 	}
 }
