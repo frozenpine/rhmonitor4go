@@ -6,6 +6,7 @@ import (
 
 	rohon "github.com/frozenpine/rhmonitor4go"
 	"github.com/frozenpine/rhmonitor4go/service"
+	"github.com/gogo/protobuf/proto"
 )
 
 func TestSerial(t *testing.T) {
@@ -23,6 +24,12 @@ func TestSerial(t *testing.T) {
 
 	buffer, err := proto_risk_user.Marshal()
 	if err != nil {
+		t.Fatal(err)
+	}
+
+	deser := service.RiskUser{}
+
+	if err = proto.Unmarshal(buffer, &deser); err != nil {
 		t.Fatal(err)
 	}
 

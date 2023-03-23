@@ -31,9 +31,9 @@ var (
 	timeout    = 5
 
 	riskSvr        = ""
-	riskSvrPattern = regexp.MustCompile("tcp://([0-9.]+):([0-9]+)")
+	riskSvrPattern = regexp.MustCompile("tcp://([a-zA-Z0-9]+)#(.+)@([0-9.]+):([0-9]+)")
 
-	redisSvr        = "localhost:6379@2"
+	redisSvr        = "localhost:6379@1"
 	redisSvrPattern = regexp.MustCompile("(?:(.+)#)?([a-z0-9A-Z.:].+)@([0-9]+)")
 	redisChan       = "rohon.risk.accounts"
 	redisFormat     = msgProto3
@@ -85,7 +85,7 @@ func init() {
 	flag.StringVar(&ca, "ca", ca, "gRPC server cert CA path")
 	flag.IntVar(&timeout, "timeout", timeout, "gRPC call deadline in second")
 
-	flag.StringVar(&riskSvr, "svr", riskSvr, "Rohon risk server conn in format: tcp://{addr}:{port}")
+	flag.StringVar(&riskSvr, "svr", riskSvr, "Rohon risk server conn in format: tcp://{user}#{pass}@{addr}:{port}")
 
 	flag.StringVar(&redisSvr, "redis", redisSvr, "Redis server conn in format: ({pass}#)?{addr}:{port}@{db}")
 	flag.StringVar(&redisChan, "chan", redisChan, "Redis publish base channel")
@@ -98,11 +98,13 @@ func main() {
 	}
 
 	match := riskSvrPattern.FindStringSubmatch(riskSvr)
-	if len(match) != 3 {
+	if len(match) != 5 {
 		log.Fatalf("Invalid risk server conn: %s", riskSvr)
 	}
-	riskSvrAddr := match[1]
-	riskSvrPort, _ := strconv.Atoi(match[2])
+	riskUser := match[1]
+	riskPass := match[2]
+	riskSvrAddr := match[3]
+	riskSvrPort, _ := strconv.Atoi(match[4])
 
 	match = redisSvrPattern.FindStringSubmatch(redisSvr)
 	if len(match) != 4 {
@@ -228,8 +230,8 @@ func main() {
 		ApiIdentity: apiIdentity,
 		Request: &service.Request_Login{
 			Login: &service.RiskUser{
-				UserId:   "rdfk",
-				Password: "888888",
+				UserId:   riskUser,
+				Password: riskPass,
 			},
 		},
 	}); err != nil {
