@@ -6,12 +6,13 @@ import (
 )
 
 func TestParse(t *testing.T) {
-	riskSvr := "tcp://210.22.96.58:11102"
-	riskSvrPattern := regexp.MustCompile("tcp://([0-9.]+):([0-9]+)")
+	riskSvr := "tcp://rdfk#888888@210.22.96.58:11102"
+	riskSvrPattern := regexp.MustCompile(
+		"tcp://([a-zA-Z0-9]+)#(.+)@([0-9.]+):([0-9]+)")
 
 	match := riskSvrPattern.FindStringSubmatch(riskSvr)
 
-	if len(match) != 3 {
+	if len(match) != 5 {
 		t.Fatal("mismatch")
 	}
 
