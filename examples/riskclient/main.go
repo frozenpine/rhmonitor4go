@@ -30,38 +30,27 @@ var (
 	ca         = "ca.crt"
 	timeout    = 5
 
+	dbFile = "trade.db"
+
 	riskSvr        = ""
 	riskSvrPattern = regexp.MustCompile("tcp://([a-zA-Z0-9]+)#(.+)@([0-9.]+):([0-9]+)")
 
 	redisSvr        = "localhost:6379@1"
-	redisSvrPattern = regexp.MustCompile("(?:(.+)#)?([a-z0-9A-Z.:].+)@([0-9]+)")
-	redisChan       = "rohon.risk.accounts"
-	redisFormat     = msgProto3
+	redisSvrPattern = regexp.MustCompile("(?:(.+)@)?([a-z0-9A-Z.:].+)#([0-9]+)")
+	redisChanBase   = "rohon.risk.accounts"
+	redisFormat     = MsgProto3
 )
 
-type msgFormat uint8
+type MsgFormat uint8
 
-func (msgFmt *msgFormat) String() string {
-	switch *msgFmt {
-	case msgProto3:
-		return "proto3"
-	case msgJson:
-		return "json"
-	case msgPack:
-		return "msgpack"
-	default:
-		return "unknown"
-	}
-}
-
-func (msgFmt *msgFormat) Set(value string) error {
+func (msgFmt *MsgFormat) Set(value string) error {
 	switch value {
 	case "proto3":
-		*msgFmt = msgProto3
+		*msgFmt = MsgProto3
 	case "json":
-		*msgFmt = msgJson
+		*msgFmt = MsgJson
 	case "msgpack":
-		*msgFmt = msgPack
+		*msgFmt = MsgPack
 	default:
 		return errors.New("invalid msg format")
 	}
@@ -69,10 +58,11 @@ func (msgFmt *msgFormat) Set(value string) error {
 	return nil
 }
 
+//go:generate stringer -type MsgFormat -linecomment
 const (
-	msgProto3 msgFormat = iota
-	msgJson
-	msgPack
+	MsgProto3 MsgFormat = iota // proto3
+	MsgJson                    // json
+	MsgPack                    // msgpack
 )
 
 func init() {
@@ -87,9 +77,11 @@ func init() {
 
 	flag.StringVar(&riskSvr, "svr", riskSvr, "Rohon risk server conn in format: tcp://{user}#{pass}@{addr}:{port}")
 
-	flag.StringVar(&redisSvr, "redis", redisSvr, "Redis server conn in format: ({pass}#)?{addr}:{port}@{db}")
-	flag.StringVar(&redisChan, "chan", redisChan, "Redis publish base channel")
-	flag.Var(&redisFormat, "format", "Redis message marshal format")
+	flag.StringVar(&dbFile, "db", dbFile, "Database file")
+
+	flag.StringVar(&redisSvr, "redis", redisSvr, "Redis server conn in format: ({pass}@)?{addr}:{port}#{db}")
+	flag.StringVar(&redisChanBase, "chan", redisChanBase, "Redis publish base channel")
+	flag.Var(&redisFormat, "format", "Redis message marshal format (default: proto3)")
 }
 
 func main() {
@@ -160,6 +152,26 @@ func main() {
 		} else {
 			log.Println("gRPC conn closed")
 		}
+	}()
+
+	preSink := &SinkAccount{}
+	sink := &SinkAccount{}
+	sinker, err := insertDB[SinkAccount](
+		ctx, `INSERT INTO operation_trading_account(
+			trading_day, account_id, timestamp, pre_balance,
+			balance, deposit, withdraw, profit, fee, margin, available
+		) VALUES (
+			?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+		);`,
+		"TradingDay", "InvestorID", "Timestamp", "PreBalance",
+		"Balance", "Deposit", "Withdraw", "Profit", "Fee",
+		"Margin", "Available",
+	)
+	if err != nil {
+		log.Fatal("Make sink handler failed:", err)
+	}
+	defer func() {
+		db.Close()
 	}()
 
 	rdb := redis.NewClient(&redis.Options{
@@ -266,7 +278,7 @@ func main() {
 		log.Fatalf("Subscribe investor's account failed: %+v", err)
 	}
 
-	pubChan := []string{redisChan, ""}
+	pubChan := []string{redisChanBase, ""}
 	var buffer []byte
 
 	for {
@@ -279,12 +291,22 @@ func main() {
 
 		fmt.Printf("OnRtnInvestorMoney %+v\n", acct)
 
+		sink.FromAccount(acct)
+
+		if !preSink.Compare(sink) {
+			continue
+		}
+
+		if _, err := sinker(sink); err != nil {
+			log.Fatal("Sink accout to db failed:", err)
+		}
+
 		pubChan[1] = acct.Investor.InvestorId
 
 		switch redisFormat {
-		case msgProto3:
+		case MsgProto3:
 			buffer, err = acct.Marshal()
-		case msgJson:
+		case MsgJson:
 			buffer, err = json.Marshal(acct)
 		default:
 			log.Fatal("Unsupported message format: ", redisFormat)
@@ -304,9 +326,4 @@ func main() {
 			)
 		}
 	}
-
-	// log.Printf("Starting gRPC client")
-	// if err := cli.Serve(ctx, service.NewRohonMonitorClient(conn)); err != nil {
-	// 	log.Fatalf("Client running failed: %+v", err)
-	// }
 }
