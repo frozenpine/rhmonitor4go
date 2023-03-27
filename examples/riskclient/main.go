@@ -336,14 +336,14 @@ func main() {
 			ticker.Reset(barDuration)
 			timer.Stop()
 
-			waterMark.Timestamp = t.UnixMicro()
+			waterMark.Timestamp = t.UnixMilli()
 			buffer, err = waterMark.Marshal()
 			if err != nil {
 				log.Fatal("Can not marshal water mark")
 			}
 			cmd = rdb.Publish(ctx, defaultPubChan, buffer)
 		case t := <-ticker.C:
-			waterMark.Timestamp = t.UnixMicro()
+			waterMark.Timestamp = t.UnixMilli()
 			buffer, err = waterMark.Marshal()
 			if err != nil {
 				log.Fatal("Can not marshal water mark")

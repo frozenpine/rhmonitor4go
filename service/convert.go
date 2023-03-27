@@ -409,6 +409,6 @@ func ConvertAccount(acct *rohon.Account) *Account {
 		DynamicMoney:      acct.DynamicMoney,
 		Premium:           acct.Premium,
 		MarketValueEquity: acct.MarketValueEquity,
-		Timestamp:         time.Now().UnixMicro(),
+		Timestamp:         time.Now().UnixMilli(),
 	}
 }
