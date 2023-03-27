@@ -8,6 +8,7 @@ import (
 	"log"
 	"reflect"
 	"strings"
+	"time"
 	"unsafe"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -51,7 +52,14 @@ PRIMARY KEY ("trading_day", "account_id", "timestamp")
 );`
 )
 
+var (
+	ErrSameData = errors.New("same with old data")
+)
+
 type SinkAccount struct {
+	preData *SinkAccount
+	sinker  func(interface{}) (sql.Result, error)
+
 	InvestorID string
 	TradingDay string
 	Timestamp  int64
@@ -63,6 +71,32 @@ type SinkAccount struct {
 	Fee        float64
 	Margin     float64
 	Available  float64
+}
+
+func NewSinkAccount(ctx context.Context) (*SinkAccount, error) {
+	acct := SinkAccount{
+		preData: &SinkAccount{},
+	}
+
+	var err error
+
+	acct.sinker, err = insertDB[SinkAccount](
+		ctx, `INSERT INTO operation_trading_account(
+			trading_day, account_id, timestamp, pre_balance,
+			balance, deposit, withdraw, profit, fee, margin, available
+		) VALUES (
+			?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+		);`,
+		"TradingDay", "InvestorID", "Timestamp", "PreBalance",
+		"Balance", "Deposit", "Withdraw", "Profit", "Fee",
+		"Margin", "Available",
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &acct, nil
 }
 
 func (acct *SinkAccount) FromAccount(value *service.Account) {
@@ -138,17 +172,46 @@ func (acct *SinkAccount) Compare(other *SinkAccount) (diff bool) {
 	return
 }
 
+func (acct *SinkAccount) Insert() error {
+	if !acct.preData.Compare(acct) {
+		return ErrSameData
+	}
+
+	_, err := acct.sinker(acct)
+
+	return err
+}
+
+type BarMode uint8
+
+type SinkAccountBar struct {
+	preData *SinkAccountBar
+	sinker  func(interface{}) (sql.Result, error)
+
+	TradingDay string
+	AccountID  string
+	Timestamp  int64
+	Duration   time.Duration
+	Open       float64
+	Close      float64
+	Highest    float64
+	Lowest     float64
+}
+
 var (
 	db *sql.DB
 )
 
 func initDB() (err error) {
 	if db, err = sql.Open("sqlite3", dbFile); err != nil {
-		log.Fatal("Open database failed:", err)
+		log.Fatal("Open database failed:", dbFile, err)
 	}
 
 	if _, err = db.Exec(structuresSQL); err != nil {
-		log.Fatal("Create table failed:", err)
+		log.Fatalf(
+			"Create table failed: %s, %s\n%s",
+			dbFile, err, structuresSQL,
+		)
 	}
 
 	return

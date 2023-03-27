@@ -18,6 +18,7 @@ import (
 
 	"github.com/frozenpine/rhmonitor4go/service"
 	"github.com/go-redis/redis/v8"
+	"github.com/gogo/protobuf/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
@@ -35,10 +36,12 @@ var (
 	riskSvr        = ""
 	riskSvrPattern = regexp.MustCompile("tcp://([a-zA-Z0-9]+)#(.+)@([0-9.]+):([0-9]+)")
 
-	redisSvr        = "localhost:6379@1"
+	redisSvr        = "localhost:6379#1"
 	redisSvrPattern = regexp.MustCompile("(?:(.+)@)?([a-z0-9A-Z.:].+)#([0-9]+)")
 	redisChanBase   = "rohon.risk.accounts"
 	redisFormat     = MsgProto3
+
+	barDuration = time.Minute
 )
 
 type MsgFormat uint8
@@ -89,6 +92,10 @@ func main() {
 		flag.Parse()
 	}
 
+	if err := initDB(); err != nil {
+		log.Fatal("Init db failed:", err)
+	}
+
 	match := riskSvrPattern.FindStringSubmatch(riskSvr)
 	if len(match) != 5 {
 		log.Fatalf("Invalid risk server conn: %s", riskSvr)
@@ -128,8 +135,9 @@ func main() {
 		RootCAs:      caPool,
 	}
 
+	var runCancel context.CancelFunc
 	ctx := context.Background()
-	signal.NotifyContext(ctx, os.Interrupt, os.Kill)
+	ctx, runCancel = signal.NotifyContext(ctx, os.Interrupt, os.Kill)
 
 	remoteAddr := fmt.Sprintf("%s:%d", rpcAddr, rpcPort)
 	log.Printf("Connecting to gRPC server: %s", remoteAddr)
@@ -154,19 +162,7 @@ func main() {
 		}
 	}()
 
-	preSink := &SinkAccount{}
-	sink := &SinkAccount{}
-	sinker, err := insertDB[SinkAccount](
-		ctx, `INSERT INTO operation_trading_account(
-			trading_day, account_id, timestamp, pre_balance,
-			balance, deposit, withdraw, profit, fee, margin, available
-		) VALUES (
-			?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-		);`,
-		"TradingDay", "InvestorID", "Timestamp", "PreBalance",
-		"Balance", "Deposit", "Withdraw", "Profit", "Fee",
-		"Margin", "Available",
-	)
+	sinkAccount, err := NewSinkAccount(ctx)
 	if err != nil {
 		log.Fatal("Make sink handler failed:", err)
 	}
@@ -278,46 +274,100 @@ func main() {
 		log.Fatalf("Subscribe investor's account failed: %+v", err)
 	}
 
-	pubChan := []string{redisChanBase, ""}
-	var buffer []byte
+	var (
+		buffer         []byte
+		pubChan        = []string{redisChanBase, ""}
+		defaultPubChan = redisChanBase + ".default"
+		marshaller     func(any) ([]byte, error)
+		receiveCh      = make(chan *service.Account, 1)
+	)
+
+	go func() {
+		defer runCancel()
+
+		for {
+			acct, err := stream.Recv()
+
+			if err != nil {
+				log.Printf("Receive investor's account failed: %+v", err)
+				break
+			}
+
+			fmt.Printf("OnRtnInvestorMoney %+v\n", acct)
+			receiveCh <- acct
+		}
+	}()
+
+	switch redisFormat {
+	case MsgProto3:
+		marshaller = func(value any) ([]byte, error) {
+			data, ok := value.(proto.Message)
+			if !ok {
+				return nil, errors.New("invalid proto3 message")
+			}
+
+			return proto.Marshal(data)
+		}
+	case MsgJson:
+		marshaller = json.Marshal
+	default:
+		log.Fatal("Unsupported message format: ", redisFormat)
+	}
+
+	now := time.Now()
+	nextTs := now.Round(barDuration)
+
+	if nextTs.Before(now) {
+		nextTs = nextTs.Add(barDuration)
+	}
+
+	timer := time.NewTimer(nextTs.Sub(now))
+	ticker := time.NewTicker(barDuration)
+	ticker.Stop()
+	waterMark := &service.Account{}
+	var cmd *redis.IntCmd
 
 	for {
-		acct, err := stream.Recv()
+		select {
+		case <-ctx.Done():
+			return
+		case t := <-timer.C:
+			log.Printf("Bar ticker first initialized: %+v", t)
+			ticker.Reset(barDuration)
+			timer.Stop()
 
-		if err != nil {
-			log.Printf("Receive investor's account failed: %+v", err)
-			break
+			waterMark.Timestamp = t.UnixMicro()
+			buffer, err = waterMark.Marshal()
+			if err != nil {
+				log.Fatal("Can not marshal water mark")
+			}
+			cmd = rdb.Publish(ctx, defaultPubChan, buffer)
+		case t := <-ticker.C:
+			waterMark.Timestamp = t.UnixMicro()
+			buffer, err = waterMark.Marshal()
+			if err != nil {
+				log.Fatal("Can not marshal water mark")
+			}
+			cmd = rdb.Publish(ctx, defaultPubChan, buffer)
+		case acct := <-receiveCh:
+			sinkAccount.FromAccount(acct)
+
+			if err = sinkAccount.Insert(); err != nil {
+				if errors.Is(err, ErrSameData) {
+					continue
+				} else {
+					log.Fatal("Sink accout to db failed:", err)
+				}
+			}
+
+			if buffer, err = marshaller(acct); err != nil {
+				log.Printf("Marshal account message failed: %s", err)
+				continue
+			}
+
+			pubChan[1] = acct.Investor.InvestorId
+			cmd = rdb.Publish(ctx, strings.Join(pubChan, "."), buffer)
 		}
-
-		fmt.Printf("OnRtnInvestorMoney %+v\n", acct)
-
-		sink.FromAccount(acct)
-
-		if !preSink.Compare(sink) {
-			continue
-		}
-
-		if _, err := sinker(sink); err != nil {
-			log.Fatal("Sink accout to db failed:", err)
-		}
-
-		pubChan[1] = acct.Investor.InvestorId
-
-		switch redisFormat {
-		case MsgProto3:
-			buffer, err = acct.Marshal()
-		case MsgJson:
-			buffer, err = json.Marshal(acct)
-		default:
-			log.Fatal("Unsupported message format: ", redisFormat)
-		}
-
-		if err != nil {
-			log.Printf("Marshal account message failed: %s", err)
-			continue
-		}
-
-		cmd := rdb.Publish(ctx, strings.Join(pubChan, "."), buffer)
 
 		if err = cmd.Err(); err != nil {
 			log.Printf(
