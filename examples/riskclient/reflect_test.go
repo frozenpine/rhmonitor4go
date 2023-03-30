@@ -28,6 +28,8 @@ func TestFieldReflect(t *testing.T) {
 
 	typ := reflect.TypeOf(new(service.Account)).Elem()
 
+	t.Log(typ.Name())
+
 	fieldOffsets := []struct {
 		offset uintptr
 		typ    reflect.Type
@@ -67,7 +69,9 @@ func TestFieldReflect(t *testing.T) {
 	v := reflect.NewAt(
 		reflect.TypeOf(acct.PreBalance),
 		unsafe.Pointer(
-			reflect.Indirect(reflect.ValueOf(&acct)).Addr().Pointer()+fieldOffsets[1].offset,
+			reflect.Indirect(
+				reflect.ValueOf(&acct),
+			).Addr().Pointer()+fieldOffsets[1].offset,
 		),
 	)
 	t.Log(v, &acct.PreBalance)

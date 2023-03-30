@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"log"
 	"reflect"
+	"runtime"
 	"strings"
+	"sync"
 	"time"
 	"unsafe"
 
@@ -57,52 +59,23 @@ var (
 )
 
 type SinkAccount struct {
-	preData *SinkAccount
-	sinker  func(interface{}) (sql.Result, error)
-
-	InvestorID string
-	TradingDay string
-	Timestamp  int64
-	PreBalance float64
-	Balance    float64
-	Deposit    float64
-	Withdraw   float64
-	Profit     float64
-	Fee        float64
-	Margin     float64
-	Available  float64
-}
-
-func NewSinkAccount(ctx context.Context) (*SinkAccount, error) {
-	acct := SinkAccount{
-		preData: &SinkAccount{},
-	}
-
-	var err error
-
-	acct.sinker, err = insertDB[SinkAccount](
-		ctx, `INSERT INTO operation_trading_account(
-			trading_day, account_id, timestamp, pre_balance,
-			balance, deposit, withdraw, profit, fee, margin, available
-		) VALUES (
-			?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-		);`,
-		"TradingDay", "InvestorID", "Timestamp", "PreBalance",
-		"Balance", "Deposit", "Withdraw", "Profit", "Fee",
-		"Margin", "Available",
-	)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &acct, nil
+	InvestorID string  `sql:"account_id"`
+	TradingDay string  `sql:"trading_day"`
+	Timestamp  int64   `sql:"timestamp"`
+	PreBalance float64 `sql:"pre_balance"`
+	Balance    float64 `sql:"balance"`
+	Deposit    float64 `sql:"deposit"`
+	Withdraw   float64 `sql:"withdraw"`
+	Profit     float64 `sql:"profit"`
+	Fee        float64 `sql:"fee"`
+	Margin     float64 `sql:"margin"`
+	Available  float64 `sql:"available"`
 }
 
 func (acct *SinkAccount) FromAccount(value *service.Account) {
 	acct.TradingDay = value.TradingDay
 	acct.InvestorID = value.Investor.InvestorId
-	acct.Timestamp = value.Timestamp
+	acct.Timestamp = time.Now().UnixMilli()
 	acct.PreBalance = value.PreBalance
 	acct.Deposit = value.Deposit
 	acct.Withdraw = value.Withdraw
@@ -113,89 +86,306 @@ func (acct *SinkAccount) FromAccount(value *service.Account) {
 	acct.Balance = acct.PreBalance + acct.Deposit - acct.Withdraw + acct.Profit - value.Commission
 }
 
-func (acct *SinkAccount) Compare(other *SinkAccount) (diff bool) {
-	if acct.InvestorID != "" && acct.InvestorID != other.InvestorID {
-		log.Print("Compare to diff investors:", acct.InvestorID, other.InvestorID)
-		return
-	}
+// func (acct *SinkAccount) Compare(other *SinkAccount) (diff bool) {
+// 	if acct.InvestorID != "" && acct.InvestorID != other.InvestorID {
+// 		log.Print("Compare to diff investors:", acct.InvestorID, other.InvestorID)
+// 		return
+// 	}
 
-	if acct.Timestamp >= other.Timestamp {
-		log.Printf("Compare to old tick: \n%+v\n%+v", acct, other)
-		return
-	}
+// 	if acct.Timestamp >= other.Timestamp {
+// 		log.Printf("Compare to old tick: \n%+v\n%+v", acct, other)
+// 		return
+// 	}
 
-	if acct.TradingDay != other.TradingDay {
-		acct.TradingDay = other.TradingDay
-		diff = true
-	}
+// 	if acct.TradingDay != other.TradingDay {
+// 		acct.TradingDay = other.TradingDay
+// 		diff = true
+// 	}
 
-	if acct.PreBalance != other.PreBalance {
-		acct.PreBalance = other.PreBalance
-		diff = true
-	}
+// 	if acct.PreBalance != other.PreBalance {
+// 		acct.PreBalance = other.PreBalance
+// 		diff = true
+// 	}
 
-	if acct.Deposit != other.Deposit {
-		acct.Deposit = other.Deposit
-		diff = true
-	}
+// 	if acct.Deposit != other.Deposit {
+// 		acct.Deposit = other.Deposit
+// 		diff = true
+// 	}
 
-	if acct.Withdraw != other.Withdraw {
-		acct.Withdraw = other.Withdraw
-		diff = true
-	}
+// 	if acct.Withdraw != other.Withdraw {
+// 		acct.Withdraw = other.Withdraw
+// 		diff = true
+// 	}
 
-	if acct.Profit != other.Profit {
-		acct.Profit = other.Profit
-		diff = true
-	}
+// 	if acct.Profit != other.Profit {
+// 		acct.Profit = other.Profit
+// 		diff = true
+// 	}
 
-	if acct.Fee != other.Fee {
-		acct.Fee = other.Fee
-		diff = true
-	}
+// 	if acct.Fee != other.Fee {
+// 		acct.Fee = other.Fee
+// 		diff = true
+// 	}
 
-	if acct.Margin != other.Margin {
-		acct.Margin = other.Margin
-		diff = true
-	}
+// 	if acct.Margin != other.Margin {
+// 		acct.Margin = other.Margin
+// 		diff = true
+// 	}
 
-	if acct.Available != other.Available {
-		acct.Available = other.Available
-		diff = true
-	}
+// 	if acct.Available != other.Available {
+// 		acct.Available = other.Available
+// 		diff = true
+// 	}
 
-	if acct.Balance != other.Balance {
-		acct.Balance = other.Balance
-		diff = true
-	}
+// 	if acct.Balance != other.Balance {
+// 		acct.Balance = other.Balance
+// 		diff = true
+// 	}
 
-	return
-}
-
-func (acct *SinkAccount) Insert() error {
-	if !acct.preData.Compare(acct) {
-		return ErrSameData
-	}
-
-	_, err := acct.sinker(acct)
-
-	return err
-}
+// 	return
+// }
 
 type BarMode uint8
 
-type SinkAccountBar struct {
-	preData *SinkAccountBar
-	sinker  func(interface{}) (sql.Result, error)
+const (
+	Continuous BarMode = 1 << iota
+	FirstTick
+)
 
-	TradingDay string
-	AccountID  string
-	Timestamp  int64
-	Duration   time.Duration
-	Open       float64
-	Close      float64
-	Highest    float64
-	Lowest     float64
+type SinkAccountBar struct {
+	TradingDay string  `sql:"trading_day"`
+	AccountID  string  `sql:"account_id"`
+	Timestamp  int64   `sql:"timestamp"`
+	Duration   string  `sql:"duration"`
+	Open       float64 `sql:"open"`
+	Close      float64 `sql:"close"`
+	Highest    float64 `sql:"high"`
+	Lowest     float64 `sql:"low"`
+}
+
+type AccountSinker struct {
+	mode       BarMode
+	barSinker  func(interface{}) (sql.Result, error)
+	acctSinker func(interface{}) (sql.Result, error)
+
+	ctx         context.Context
+	source      service.RohonMonitor_SubInvestorMoneyClient
+	output      chan *service.Account
+	waterMark   *service.Account
+	accountPool sync.Pool
+	barPool     sync.Pool
+
+	duration     time.Duration
+	settlements  map[string]*service.Account
+	tradingDay   string
+	accountCache map[string][]*service.Account
+	barCache     map[string]*SinkAccountBar
+}
+
+func NewAccountSinker(
+	ctx context.Context,
+	mode BarMode, dur time.Duration,
+	settlements map[string]*service.Account,
+	src service.RohonMonitor_SubInvestorMoneyClient,
+) (*AccountSinker, error) {
+	if src == nil || settlements == nil {
+		return nil, errors.New("invalid sinker args")
+	}
+
+	acctSinker, err := InsertDB[SinkAccount](
+		ctx, "operation_trading_account",
+		"TradingDay", "InvestorID", "Timestamp", "PreBalance",
+		"Balance", "Deposit", "Withdraw", "Profit", "Fee",
+		"Margin", "Available",
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	barSinker, err := InsertDB[SinkAccountBar](
+		ctx, "operation_account_kbar",
+		"TradingDay", "AccountID", "Timestamp", "Duration",
+		"Open", "Close", "Highest", "Lowest",
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	tradingDay := ""
+	for _, v := range settlements {
+		tradingDay = v.GetTradingDay()
+		break
+	}
+
+	sinker := &AccountSinker{
+		ctx:        ctx,
+		mode:       mode,
+		acctSinker: acctSinker,
+		barSinker:  barSinker,
+		source:     src,
+		output:     make(chan *service.Account, 1),
+		waterMark: &service.Account{
+			TradingDay: tradingDay,
+			Investor: &service.Investor{
+				InvestorId: "default",
+			},
+		},
+		duration:     dur,
+		accountPool:  sync.Pool{New: func() any { return new(SinkAccount) }},
+		barPool:      sync.Pool{New: func() any { return new(SinkAccountBar) }},
+		tradingDay:   tradingDay,
+		settlements:  settlements,
+		accountCache: make(map[string][]*service.Account),
+		barCache:     make(map[string]*SinkAccountBar),
+	}
+
+	go sinker.run()
+
+	return sinker, nil
+}
+
+func (sink *AccountSinker) newSinkAccount() *SinkAccount {
+	data := sink.accountPool.Get()
+	runtime.SetFinalizer(data, sink.accountPool.Put)
+	return data.(*SinkAccount)
+}
+
+func (sink *AccountSinker) newSinkBar() *SinkAccountBar {
+	data := sink.barPool.Get()
+	runtime.SetFinalizer(data, sink.barPool.Put)
+	return data.(*SinkAccountBar)
+}
+
+func (sink *AccountSinker) boundary(ts time.Time) {
+	sink.waterMark.Timestamp = ts.UnixMilli()
+
+	for accountID, settAccount := range sink.settlements {
+		accountList := sink.accountCache[accountID]
+
+		preBar := sink.barCache[accountID]
+
+		if preBar == nil {
+			preBar = &SinkAccountBar{
+				AccountID:  accountID,
+				TradingDay: sink.tradingDay,
+				Close:      settAccount.PreBalance,
+			}
+			sink.barCache[accountID] = preBar
+		}
+
+		var (
+			open             = preBar.Close
+			high, low, close float64
+		)
+
+		for _, v := range accountList {
+			if high == 0 {
+				high = v.Balance
+			} else if v.Balance > high {
+				high = v.Balance
+			}
+
+			if low == 0 {
+				low = v.Balance
+			} else if v.Balance < low {
+				low = v.Balance
+			}
+		}
+
+		count := len(accountList)
+
+		if count > 0 {
+			if sink.mode == FirstTick {
+				open = accountList[0].Balance
+			}
+
+			close = accountList[count-1].Balance
+		} else {
+			close = open
+		}
+
+		bar := sink.newSinkBar()
+		bar.TradingDay = sink.tradingDay
+		bar.AccountID = accountID
+		bar.Timestamp = ts.Round(sink.duration).UnixMilli()
+		bar.Duration = sink.duration.String()
+		bar.Open = open
+		bar.Close = close
+		bar.Highest = high
+		bar.Lowest = low
+
+		if _, err := sink.barSinker(bar); err != nil {
+			log.Printf("Sink account bar failed: %+v", err)
+		}
+
+		sink.barCache[accountID] = bar
+
+		sink.output <- sink.waterMark
+	}
+}
+
+func (sink *AccountSinker) run() {
+	inputChan := make(chan *service.Account, 1)
+
+	go func() {
+		log.Print("Starting gRPC Account data receiver")
+		for {
+			acct, err := sink.source.Recv()
+
+			if err != nil {
+				log.Printf("Receive investor's account failed: %+v", err)
+				break
+			}
+
+			fmt.Printf("OnRtnInvestorMoney %+v\n", acct)
+			inputChan <- acct
+		}
+	}()
+
+	now := time.Now()
+	nextTs := now.Round(sink.duration)
+
+	if nextTs.Before(now) {
+		nextTs = nextTs.Add(sink.duration)
+	}
+
+	timer := time.NewTimer(nextTs.Sub(now))
+	ticker := time.NewTicker(sink.duration)
+
+	ticker.Stop()
+
+	for {
+		select {
+		case <-sink.ctx.Done():
+			return
+		case ts := <-timer.C:
+			log.Printf("Bar ticker first initialized: %+v", ts)
+			ticker.Reset(sink.duration)
+			timer.Stop()
+
+			sink.boundary(ts)
+		case ts := <-ticker.C:
+			sink.boundary(ts)
+		case acct := <-inputChan:
+			sinkAccount := sink.newSinkAccount()
+			sinkAccount.FromAccount(acct)
+
+			if _, err := sink.acctSinker(sinkAccount); err != nil {
+				log.Print("Sink data failed:", err)
+			}
+
+			sink.accountCache[acct.Investor.InvestorId] = append(
+				sink.accountCache[acct.Investor.InvestorId],
+				acct,
+			)
+
+			sink.output <- acct
+		}
+	}
+}
+
+func (sink *AccountSinker) Data() <-chan *service.Account {
+	return sink.output
 }
 
 var (
@@ -203,6 +393,8 @@ var (
 )
 
 func initDB() (err error) {
+	log.Print("Try to open db file:", dbFile)
+
 	if db, err = sql.Open("sqlite3", dbFile); err != nil {
 		log.Fatal("Open database failed:", dbFile, err)
 	}
@@ -217,39 +409,50 @@ func initDB() (err error) {
 	return
 }
 
-func insertDB[T any](
+type fieldOffset struct {
+	offset uintptr
+	typ    reflect.Type
+}
+
+func InsertDB[T any](
 	ctx context.Context,
-	query string,
+	tblName string,
 	argNames ...string,
 ) (func(v interface{}) (sql.Result, error), error) {
-	argCount := strings.Count(query, "?")
-	if len(argNames) != argCount {
-		return nil, errors.New("args mismatch in query")
+	if tblName == "" {
+		return nil, errors.New("no table name")
 	}
 
-	typ := reflect.TypeOf(new(T)).Elem()
+	obj := new(T)
+	typ := reflect.TypeOf(obj).Elem()
+	argLen := len(argNames)
 
-	fieldOffsets := []struct {
-		offset uintptr
-		typ    reflect.Type
-	}{}
+	fieldOffsets := make([]fieldOffset, argLen)
+	sqlFields := make([]string, argLen)
+	argList := make([]string, argLen)
 
-	for _, name := range argNames {
+	for idx, name := range argNames {
 		if field, ok := typ.FieldByName(name); !ok {
 			return nil, fmt.Errorf("%s has no field name: %s", typ.Name(), name)
 		} else {
-			fieldOffsets = append(fieldOffsets, struct {
-				offset uintptr
-				typ    reflect.Type
-			}{
+			fieldOffsets[idx] = fieldOffset{
 				offset: field.Offset,
 				typ:    field.Type,
-			})
+			}
+			sqlFields[idx] = field.Tag.Get("sql")
+			argList[idx] = "?"
 		}
 	}
 
+	sqlTpl := fmt.Sprintf(
+		"INSERT INTO %s(%s) VALUES (%s);",
+		tblName,
+		strings.Join(sqlFields, ","),
+		strings.Join(argList, ","),
+	)
+
 	getArgList := func(v interface{}) []interface{} {
-		basePtr := reflect.Indirect((reflect.ValueOf(v))).Addr().Pointer()
+		basePtr := reflect.Indirect(reflect.ValueOf(v)).Addr().Pointer()
 
 		argList := []interface{}{}
 
@@ -266,6 +469,10 @@ func insertDB[T any](
 	}
 
 	return func(v interface{}) (sql.Result, error) {
-		return db.ExecContext(ctx, query, getArgList(v)...)
+		values := getArgList(v)
+
+		log.Printf("Executing: %s, %s, %+v", sqlTpl, values, v)
+
+		return db.ExecContext(ctx, sqlTpl, values...)
 	}, nil
 }

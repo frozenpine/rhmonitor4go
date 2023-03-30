@@ -85,6 +85,8 @@ func init() {
 	flag.StringVar(&redisSvr, "redis", redisSvr, "Redis server conn in format: ({pass}@)?{addr}:{port}#{db}")
 	flag.StringVar(&redisChanBase, "chan", redisChanBase, "Redis publish base channel")
 	flag.Var(&redisFormat, "format", "Redis message marshal format (default: proto3)")
+
+	flag.DurationVar(&barDuration, "bar", barDuration, "Bar duration")
 }
 
 func main() {
@@ -135,9 +137,8 @@ func main() {
 		RootCAs:      caPool,
 	}
 
-	var runCancel context.CancelFunc
 	ctx := context.Background()
-	ctx, runCancel = signal.NotifyContext(ctx, os.Interrupt, os.Kill)
+	ctx, _ = signal.NotifyContext(ctx, os.Interrupt, os.Kill)
 
 	remoteAddr := fmt.Sprintf("%s:%d", rpcAddr, rpcPort)
 	log.Printf("Connecting to gRPC server: %s", remoteAddr)
@@ -160,14 +161,6 @@ func main() {
 		} else {
 			log.Println("gRPC conn closed")
 		}
-	}()
-
-	sinkAccount, err := NewSinkAccount(ctx)
-	if err != nil {
-		log.Fatal("Make sink handler failed:", err)
-	}
-	defer func() {
-		db.Close()
 	}()
 
 	rdb := redis.NewClient(&redis.Options{
@@ -259,10 +252,23 @@ func main() {
 	}); err != nil {
 		log.Fatalf("Query accounts failed: +%v", err)
 	} else {
-		investors := result.GetInvestors()
-
-		for _, inv := range investors.Data {
+		for _, inv := range result.GetInvestors().GetData() {
 			fmt.Printf("gRPC query investor: %+v\n", inv)
+		}
+	}
+	cancel()
+
+	deadline, cancel = context.WithTimeout(ctx, time.Second*time.Duration(timeout))
+	settAccounts := make(map[string]*service.Account)
+
+	if result, err = client.ReqQryInvestorMoney(deadline, &service.Request{
+		ApiIdentity: apiIdentity,
+	}); err != nil {
+		log.Fatalf("Query investor's money failed: +%v", err)
+	} else {
+		for _, acct := range result.GetAccounts().GetData() {
+			settAccounts[acct.Investor.InvestorId] = acct
+			fmt.Printf("Queried account: %+v", acct)
 		}
 	}
 	cancel()
@@ -275,28 +281,15 @@ func main() {
 	}
 
 	var (
-		buffer         []byte
-		pubChan        = []string{redisChanBase, ""}
-		defaultPubChan = redisChanBase + ".default"
-		marshaller     func(any) ([]byte, error)
-		receiveCh      = make(chan *service.Account, 1)
+		buffer     []byte
+		pubChan    = []string{redisChanBase, ""}
+		marshaller func(any) ([]byte, error)
 	)
 
-	go func() {
-		defer runCancel()
-
-		for {
-			acct, err := stream.Recv()
-
-			if err != nil {
-				log.Printf("Receive investor's account failed: %+v", err)
-				break
-			}
-
-			fmt.Printf("OnRtnInvestorMoney %+v\n", acct)
-			receiveCh <- acct
-		}
-	}()
+	sinker, err := NewAccountSinker(ctx, Continuous, barDuration, settAccounts, stream)
+	if err != nil {
+		log.Fatalf("Create sinker failed: %+v", err)
+	}
 
 	switch redisFormat {
 	case MsgProto3:
@@ -314,66 +307,25 @@ func main() {
 		log.Fatal("Unsupported message format: ", redisFormat)
 	}
 
-	now := time.Now()
-	nextTs := now.Round(barDuration)
-
-	if nextTs.Before(now) {
-		nextTs = nextTs.Add(barDuration)
-	}
-
-	timer := time.NewTimer(nextTs.Sub(now))
-	ticker := time.NewTicker(barDuration)
-	ticker.Stop()
-	waterMark := &service.Account{}
-	var cmd *redis.IntCmd
-
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case t := <-timer.C:
-			log.Printf("Bar ticker first initialized: %+v", t)
-			ticker.Reset(barDuration)
-			timer.Stop()
-
-			waterMark.Timestamp = t.UnixMilli()
-			buffer, err = waterMark.Marshal()
-			if err != nil {
-				log.Fatal("Can not marshal water mark")
-			}
-			cmd = rdb.Publish(ctx, defaultPubChan, buffer)
-		case t := <-ticker.C:
-			waterMark.Timestamp = t.UnixMilli()
-			buffer, err = waterMark.Marshal()
-			if err != nil {
-				log.Fatal("Can not marshal water mark")
-			}
-			cmd = rdb.Publish(ctx, defaultPubChan, buffer)
-		case acct := <-receiveCh:
-			sinkAccount.FromAccount(acct)
-
-			if err = sinkAccount.Insert(); err != nil {
-				if errors.Is(err, ErrSameData) {
-					continue
-				} else {
-					log.Fatal("Sink accout to db failed:", err)
-				}
-			}
-
+		case acct := <-sinker.Data():
 			if buffer, err = marshaller(acct); err != nil {
 				log.Printf("Marshal account message failed: %s", err)
 				continue
 			}
 
 			pubChan[1] = acct.Investor.InvestorId
-			cmd = rdb.Publish(ctx, strings.Join(pubChan, "."), buffer)
-		}
+			cmd := rdb.Publish(ctx, strings.Join(pubChan, "."), buffer)
 
-		if err = cmd.Err(); err != nil {
-			log.Printf(
-				"Publish to redis[%s@%d] faield: %s",
-				redisSvr, redisDB, err,
-			)
+			if err = cmd.Err(); err != nil {
+				log.Printf(
+					"Publish to redis[%s@%d] faield: %s",
+					redisSvr, redisDB, err,
+				)
+			}
 		}
 	}
 }
