@@ -8,10 +8,12 @@ import (
 	"log"
 	"net"
 	"os"
+	"time"
 
 	"github.com/frozenpine/rhmonitor4go/service/hub"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/keepalive"
 )
 
 var (
@@ -69,6 +71,10 @@ func main() {
 
 	grpcSvr := grpc.NewServer(
 		grpc.Creds(credentials.NewTLS(&tlsConfig)),
+		grpc.KeepaliveParams(keepalive.ServerParameters{
+			Time:    5 * time.Second,
+			Timeout: 3 * time.Second,
+		}),
 	)
 	// grpcSvr := grpc.NewServer()
 	hub.NewRohonMonitorHub(grpcSvr)

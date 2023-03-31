@@ -86,65 +86,6 @@ func (acct *SinkAccount) FromAccount(value *service.Account) {
 	acct.Balance = acct.PreBalance + acct.Deposit - acct.Withdraw + acct.Profit - value.Commission
 }
 
-// func (acct *SinkAccount) Compare(other *SinkAccount) (diff bool) {
-// 	if acct.InvestorID != "" && acct.InvestorID != other.InvestorID {
-// 		log.Print("Compare to diff investors:", acct.InvestorID, other.InvestorID)
-// 		return
-// 	}
-
-// 	if acct.Timestamp >= other.Timestamp {
-// 		log.Printf("Compare to old tick: \n%+v\n%+v", acct, other)
-// 		return
-// 	}
-
-// 	if acct.TradingDay != other.TradingDay {
-// 		acct.TradingDay = other.TradingDay
-// 		diff = true
-// 	}
-
-// 	if acct.PreBalance != other.PreBalance {
-// 		acct.PreBalance = other.PreBalance
-// 		diff = true
-// 	}
-
-// 	if acct.Deposit != other.Deposit {
-// 		acct.Deposit = other.Deposit
-// 		diff = true
-// 	}
-
-// 	if acct.Withdraw != other.Withdraw {
-// 		acct.Withdraw = other.Withdraw
-// 		diff = true
-// 	}
-
-// 	if acct.Profit != other.Profit {
-// 		acct.Profit = other.Profit
-// 		diff = true
-// 	}
-
-// 	if acct.Fee != other.Fee {
-// 		acct.Fee = other.Fee
-// 		diff = true
-// 	}
-
-// 	if acct.Margin != other.Margin {
-// 		acct.Margin = other.Margin
-// 		diff = true
-// 	}
-
-// 	if acct.Available != other.Available {
-// 		acct.Available = other.Available
-// 		diff = true
-// 	}
-
-// 	if acct.Balance != other.Balance {
-// 		acct.Balance = other.Balance
-// 		diff = true
-// 	}
-
-// 	return
-// }
-
 type BarMode uint8
 
 const (
@@ -165,8 +106,8 @@ type SinkAccountBar struct {
 
 type AccountSinker struct {
 	mode       BarMode
-	barSinker  func(interface{}) (sql.Result, error)
-	acctSinker func(interface{}) (sql.Result, error)
+	barSinker  func(*SinkAccountBar) (sql.Result, error)
+	acctSinker func(*SinkAccount) (sql.Result, error)
 
 	ctx         context.Context
 	source      service.RohonMonitor_SubInvestorMoneyClient
@@ -319,9 +260,9 @@ func (sink *AccountSinker) boundary(ts time.Time) {
 		}
 
 		sink.barCache[accountID] = bar
-
-		sink.output <- sink.waterMark
 	}
+
+	sink.output <- sink.waterMark
 }
 
 func (sink *AccountSinker) run() {
@@ -418,29 +359,55 @@ func InsertDB[T any](
 	ctx context.Context,
 	tblName string,
 	argNames ...string,
-) (func(v interface{}) (sql.Result, error), error) {
+) (func(v *T) (sql.Result, error), error) {
 	if tblName == "" {
 		return nil, errors.New("no table name")
 	}
 
 	obj := new(T)
 	typ := reflect.TypeOf(obj).Elem()
+
 	argLen := len(argNames)
 
 	fieldOffsets := make([]fieldOffset, argLen)
 	sqlFields := make([]string, argLen)
 	argList := make([]string, argLen)
 
-	for idx, name := range argNames {
-		if field, ok := typ.FieldByName(name); !ok {
-			return nil, fmt.Errorf("%s has no field name: %s", typ.Name(), name)
-		} else {
-			fieldOffsets[idx] = fieldOffset{
+	if argLen == 0 {
+		for i := 0; i < typ.NumField(); i++ {
+			field := typ.Field(i)
+			sqlField := field.Tag.Get("sql")
+
+			if sqlField == "" {
+				continue
+			}
+
+			fieldOffsets = append(fieldOffsets, fieldOffset{
 				offset: field.Offset,
 				typ:    field.Type,
+			})
+
+			sqlFields = append(sqlFields, sqlField)
+			argList = append(argList, "?")
+		}
+	} else {
+		for idx, name := range argNames {
+			if field, ok := typ.FieldByName(name); !ok {
+				return nil, fmt.Errorf("%s has no field name: %s", typ.Name(), name)
+			} else {
+				sqlField := field.Tag.Get("sql")
+				if sqlField == "" {
+					return nil, fmt.Errorf("%s has no sql tag", field.Name)
+				}
+
+				fieldOffsets[idx] = fieldOffset{
+					offset: field.Offset,
+					typ:    field.Type,
+				}
+
+				sqlFields[idx] = sqlField
+				argList[idx] = "?"
 			}
-			sqlFields[idx] = field.Tag.Get("sql")
-			argList[idx] = "?"
 		}
 	}
 
@@ -468,7 +435,7 @@ func InsertDB[T any](
 		return argList
 	}
 
-	return func(v interface{}) (sql.Result, error) {
+	return func(v *T) (sql.Result, error) {
 		values := getArgList(v)
 
 		log.Printf("Executing: %s, %s, %+v", sqlTpl, values, v)

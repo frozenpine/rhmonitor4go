@@ -4,6 +4,8 @@ github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f h1:lO4WD4F/r
 github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f/go.mod h1:cuUVRXasLTGF7a8hSLbxyZXjz+1KgoB3wDUb6vlszIc=
 github.com/frozenpine/msgqueue v0.0.1 h1:uaGvrc1xn3+bKbTEiHJktJ4uiMP3Cnta9Gbgyuxe0GQ=
 github.com/frozenpine/msgqueue v0.0.1/go.mod h1:zz+KCmAexhgQcKue19T2m8Ko4pUhF3w7BhDhHLaLom4=
+github.com/frozenpine/reflectx v0.0.1 h1:PAE5a5Zj2fdseKkQPhyjkSjDzhQ5O1Wd7rwt34a/PO0=
+github.com/frozenpine/reflectx v0.0.1/go.mod h1:lHu4Re4rPgNdN5wW6n7kAwJebnqtchoWPM0jNe3jC2E=
 github.com/fsnotify/fsnotify v1.4.9 h1:hsms1Qyu0jgnwNXIxa+/V/PDsU6CfLf6CNO8H7IWoS4=
 github.com/go-redis/redis/v8 v8.11.5 h1:AcZZR7igkdvfVmQTPnu9WE37LRrO/YrBH5zWyjDC0oI=
 github.com/go-redis/redis/v8 v8.11.5/go.mod h1:gREzHqY1hg6oD9ngVRbLStwAWKhA0FEgq8Jd4h5lpwo=
