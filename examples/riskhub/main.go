@@ -73,7 +73,7 @@ func main() {
 		grpc.Creds(credentials.NewTLS(&tlsConfig)),
 		grpc.KeepaliveParams(keepalive.ServerParameters{
 			Time:    5 * time.Second,
-			Timeout: 3 * time.Second,
+			Timeout: 10 * time.Second,
 		}),
 	)
 	// grpcSvr := grpc.NewServer()
