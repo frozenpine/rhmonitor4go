@@ -1,0 +1,15 @@
+[Unit]
+Description=riskhub
+After=network.target
+
+[Service]
+Type=simple
+User=risk
+Group=risk
+WorkingDirectory=/home/risk/riskhub
+Environment=LD_LIBRARY_PATH=.
+ExecStart=/home/risk/riskhub/riskhub
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

@@ -1,6 +1,8 @@
 package hub
 
 import (
+	"bytes"
+	"strconv"
 	"sync/atomic"
 
 	"github.com/pkg/errors"
@@ -34,4 +36,24 @@ func (c *client) checkLogin() error {
 	c.login.Store(false)
 
 	return errors.New("[grpc] please login first")
+}
+
+func (c *client) String() string {
+	result := bytes.NewBuffer(nil)
+
+	result.WriteString(c.peer.Addr.Network())
+	result.WriteString("://")
+	result.WriteString(c.peer.Addr.String())
+	result.WriteString("@")
+	result.WriteString(c.api.front.ServerAddr)
+	result.WriteString(":")
+	result.WriteString(strconv.Itoa(int(c.api.front.ServerPort)))
+
+	if c.login.Load() {
+		result.WriteString(": Logged in")
+	} else {
+		result.WriteString(": Not login")
+	}
+
+	return result.String()
 }

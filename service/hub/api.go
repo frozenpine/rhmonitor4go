@@ -3,7 +3,6 @@ package hub
 import (
 	"context"
 	"fmt"
-	"sync"
 	"sync/atomic"
 
 	rohon "github.com/frozenpine/rhmonitor4go"
@@ -31,11 +30,11 @@ func frontToIdentity(f *service.RiskServer) string {
 type grpcRiskApi struct {
 	rhapi.AsyncRHMonitorApi
 
-	ctx             context.Context
-	front           *service.RiskServer
-	broadcastSub    atomic.Bool
-	broadcastCh     chan string
-	broadcastLock   sync.RWMutex
+	ctx   context.Context
+	front *service.RiskServer
+	// broadcastSub    atomic.Bool
+	broadcastCh chan string
+	// broadcastLock   sync.RWMutex
 	broadcastBuffer []string
 
 	state apiState

@@ -268,7 +268,7 @@ func main() {
 	} else {
 		for _, acct := range result.GetAccounts().GetData() {
 			settAccounts[acct.Investor.InvestorId] = acct
-			fmt.Printf("Queried account: %+v", acct)
+			fmt.Printf("Queried account: %+v\n", acct)
 		}
 	}
 	cancel()
