@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync/atomic"
 
+	"github.com/frozenpine/msgqueue/channel"
 	rohon "github.com/frozenpine/rhmonitor4go"
 	rhapi "github.com/frozenpine/rhmonitor4go/api"
 	"github.com/frozenpine/rhmonitor4go/service"
@@ -17,6 +18,11 @@ type apiState struct {
 	loggedIn  atomic.Bool
 	user      rohon.RiskUser
 	rspLogin  rohon.RspUserLogin
+
+	orderFlow    atomic.Pointer[channel.MemoChannel[*rohon.Order]]
+	tradeFlow    atomic.Pointer[channel.MemoChannel[*rohon.Trade]]
+	positionFlow atomic.Pointer[channel.MemoChannel[*rohon.Position]]
+	accountFlow  atomic.Pointer[channel.MemoChannel[*rohon.Account]]
 }
 
 func frontToIdentity(f *service.RiskServer) string {

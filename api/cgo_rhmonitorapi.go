@@ -19,13 +19,13 @@ import (
 	"github.com/pkg/errors"
 )
 
-var (
-	OrderTopic     = "order"
-	OffsetOrdTopic = "offsetOrd"
-	TradeTopic     = "trade"
-	PositionTopic  = "position"
-	MoneyTopic     = "money"
-)
+// var (
+// 	OrderTopic     = "order"
+// 	OffsetOrdTopic = "offsetOrd"
+// 	TradeTopic     = "trade"
+// 	PositionTopic  = "position"
+// 	MoneyTopic     = "money"
+// )
 
 func CheckRspInfo(info *rhmonitor4go.RspInfo) error {
 	if info == nil {
@@ -74,7 +74,7 @@ type RHMonitorApi struct {
 
 	requests  *RequestCache
 	investors *InvestorCache
-	accounts  *AccountCache
+	// accounts  *AccountCache
 
 	requestID int64
 }

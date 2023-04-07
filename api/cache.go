@@ -3,7 +3,6 @@ package api
 import (
 	"sync/atomic"
 
-	"github.com/frozenpine/msgqueue/channel"
 	"github.com/frozenpine/rhmonitor4go"
 )
 
@@ -127,15 +126,15 @@ func (req *RequestCache) RedoInvestorReady() (rtn int) {
 }
 
 type InvestorCache struct {
-	data         map[string]*rhmonitor4go.Investor
-	accountCache *AccountCache
+	data map[string]*rhmonitor4go.Investor
+	// accountCache *AccountCache
 	// positionCache *PositionCache
 }
 
 func NewInvestorCache() *InvestorCache {
 	cache := InvestorCache{
-		data:         make(map[string]*rhmonitor4go.Investor),
-		accountCache: &AccountCache{},
+		data: make(map[string]*rhmonitor4go.Investor),
+		// accountCache: &AccountCache{},
 		// positionCache: &PositionCache{},
 	}
 
@@ -166,40 +165,44 @@ func (cache *InvestorCache) ForEach(fn func(string, *rhmonitor4go.Investor) bool
 	}
 }
 
-type AccountCache struct {
-	data     map[string]*rhmonitor4go.Account
-	dataChan channel.Channel[rhmonitor4go.Account]
-}
+// type AccountCache struct {
+// 	data     map[string]*rhmonitor4go.Account
+// 	dataChan channel.Channel[rhmonitor4go.Account]
+// }
 
-func (cache *AccountCache) Size() int {
-	return len(cache.data)
-}
+// func (cache *AccountCache) Size() int {
+// 	return len(cache.data)
+// }
 
-func (cache *AccountCache) AddAccount(acct *rhmonitor4go.Account) string {
-	identity := acct.Identity()
+// func (cache *AccountCache) AddAccount(acct *rhmonitor4go.Account) string {
+// 	identity := acct.Identity()
 
-	cache.data[identity] = acct
+// 	cache.data[identity] = acct
 
-	return identity
-}
+// 	return identity
+// }
 
-func (cache *AccountCache) GetAccount(identity string) *rhmonitor4go.Account {
-	return cache.data[identity]
-}
+// func (cache *AccountCache) GetAccount(identity string) *rhmonitor4go.Account {
+// 	return cache.data[identity]
+// }
 
-func (cache *AccountCache) ForEach(fn func(string, *rhmonitor4go.Account) bool) {
-	for identity, account := range cache.data {
-		if !fn(identity, account) {
-			break
-		}
-	}
-}
+// func (cache *AccountCache) ForEach(fn func(string, *rhmonitor4go.Account) bool) {
+// 	for identity, account := range cache.data {
+// 		if !fn(identity, account) {
+// 			break
+// 		}
+// 	}
+// }
 
-type DataCache[T rhmonitor4go.Position | rhmonitor4go.Order | rhmonitor4go.OffsetOrder | rhmonitor4go.Account] struct {
-	data     map[string]*T
-	dataChan channel.Channel[T]
-}
+// type DataCache[T rhmonitor4go.Position |
+// 	rhmonitor4go.Order |
+// 	rhmonitor4go.OffsetOrder |
+// 	rhmonitor4go.Account |
+// 	rhmonitor4go.Trade] struct {
+// 	data     map[string]*T
+// 	dataChan channel.Channel[T]
+// }
 
-func (cache *DataCache[T]) Size() int {
-	return len(cache.data)
-}
+// func (cache *DataCache[T]) Size() int {
+// 	return len(cache.data)
+// }

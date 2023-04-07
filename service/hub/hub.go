@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/frozenpine/msgqueue/channel"
+	"github.com/frozenpine/msgqueue/core"
 	rohon "github.com/frozenpine/rhmonitor4go"
 	rhapi "github.com/frozenpine/rhmonitor4go/api"
 	"github.com/frozenpine/rhmonitor4go/service"
@@ -26,10 +28,11 @@ var (
 type RiskHub struct {
 	service.UnimplementedRohonMonitorServer
 
-	svr           *grpc.Server
-	clientCache   sync.Map
-	apiCache      sync.Map
-	apiReqTimeout time.Duration
+	svr             *grpc.Server
+	clientCache     sync.Map
+	apiCache        sync.Map
+	apiClientMapper sync.Map
+	apiReqTimeout   time.Duration
 }
 
 func (hub *RiskHub) loadClient(idt string) (*client, error) {
@@ -76,7 +79,12 @@ func (hub *RiskHub) loadAndDelApiInstance(idt string) (*grpcRiskApi, error) {
 	)
 }
 
-func (hub *RiskHub) newClient(peer *peer.Peer, api *grpcRiskApi) (string, *client) {
+func (hub *RiskHub) newClient(
+	ctx context.Context,
+	api *grpcRiskApi,
+) (string, *client) {
+	peer, _ := peer.FromContext(ctx)
+
 	idt := uuid.NewV3(
 		uuid.NamespaceDNS,
 		fmt.Sprintf("%s://%s", peer.Addr.Network(), peer.Addr.String()),
@@ -87,23 +95,16 @@ func (hub *RiskHub) newClient(peer *peer.Peer, api *grpcRiskApi) (string, *clien
 		api:  api,
 	})
 
+	hub.apiClientMapper.Store(frontToIdentity(api.front), ctx)
+
 	return idt, c.(*client)
 }
 
 func (hub *RiskHub) Init(ctx context.Context, req *service.Request) (result *service.Result, err error) {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-
 	front := req.GetFront()
 	if front == nil {
 		err = errors.Wrap(ErrInvalidArgs, "[Init] func should set [RiskServer] arg")
 		return
-	}
-
-	client, ok := peer.FromContext(ctx)
-	if !ok {
-		return nil, ErrPeerNotFound
 	}
 
 	apiIdentity := frontToIdentity(front)
@@ -115,7 +116,7 @@ func (hub *RiskHub) Init(ctx context.Context, req *service.Request) (result *ser
 			api = &grpcRiskApi{
 				broadcastCh:     make(chan string, broadcastBufferSize),
 				broadcastBuffer: make([]string, 0, broadcastBufferSize),
-				ctx:             ctx,
+				ctx:             context.Background(),
 				front:           front,
 			}
 
@@ -137,7 +138,7 @@ func (hub *RiskHub) Init(ctx context.Context, req *service.Request) (result *ser
 		}
 	}
 
-	clientIdt, c := hub.newClient(client, api)
+	clientIdt, c := hub.newClient(ctx, api)
 
 	result = &service.Result{}
 
@@ -186,6 +187,8 @@ func (hub *RiskHub) ReqUserLogin(ctx context.Context, req *service.Request) (res
 			result.Response = &service.Result_UserLogin{
 				UserLogin: service.ConvertRspLogin(&c.api.state.rspLogin),
 			}
+
+			log.Printf("Client login with api cache: %s", c)
 		} else {
 			err = errors.New("[grpc] Invalid username or password")
 		}
@@ -369,28 +372,46 @@ func (hub *RiskHub) SubInvestorOrder(req *service.Request, stream service.RohonM
 		return
 	}
 
-	// TODO: channel aggre
+	p := channel.NewMemoChannel[*rohon.Order](
+		c.api.ctx, frontToIdentity(c.api.front), 0,
+	)
 
-	var result rhapi.Result[rohon.Order]
+	if c.api.state.orderFlow.CompareAndSwap(nil, p) {
+		result := c.api.AsyncReqSubAllInvestorOrder()
 
-	if inv := req.GetInvestor(); inv != nil {
-		result = c.api.AsyncReqSubInvestorOrder(&rohon.Investor{
-			BrokerID:   inv.BrokerId,
-			InvestorID: inv.InvestorId,
-		})
+		if err = result.Await(stream.Context(), hub.apiReqTimeout); err != nil {
+			err = errors.Wrap(err, "sub investor's order failed")
+
+			return
+		}
+
+		go func() {
+			for ord := range result.GetData() {
+				p.Publish(ord, -1)
+			}
+		}()
 	} else {
-		result = c.api.AsyncReqSubAllInvestorOrder()
+		p.Release()
+		p = nil
 	}
 
-	if err = result.Await(stream.Context(), hub.apiReqTimeout); err != nil {
-		err = errors.Wrap(err, "sub investor's order failed")
+	ordFlow := c.api.state.orderFlow.Load()
 
-		return
-	}
+	subID, ch := ordFlow.Subscribe(
+		c.String(), core.Quick,
+	)
 
-	for ord := range result.GetData() {
+	filter := req.GetInvestor()
+
+	for ord := range ch {
+		if filter != nil && ord.AccountID != filter.InvestorId {
+			continue
+		}
+
 		stream.Send(service.ConvertOrder(ord))
 	}
+
+	err = ordFlow.UnSubscribe(subID)
 
 	return
 }
@@ -405,26 +426,46 @@ func (hub *RiskHub) SubInvestorTrade(req *service.Request, stream service.RohonM
 		return
 	}
 
-	var result rhapi.Result[rohon.Trade]
+	p := channel.NewMemoChannel[*rohon.Trade](
+		c.api.ctx, frontToIdentity(c.api.front), 0,
+	)
 
-	if inv := req.GetInvestor(); inv != nil {
-		result = c.api.AsyncReqSubInvestorTrade(&rohon.Investor{
-			BrokerID:   inv.BrokerId,
-			InvestorID: inv.InvestorId,
-		})
+	if c.api.state.tradeFlow.CompareAndSwap(nil, p) {
+		result := c.api.AsyncReqSubAllInvestorTrade()
+
+		if err = result.Await(stream.Context(), hub.apiReqTimeout); err != nil {
+			err = errors.Wrap(err, "sub investor's trade failed")
+
+			return
+		}
+
+		go func() {
+			for td := range result.GetData() {
+				p.Publish(td, -1)
+			}
+		}()
 	} else {
-		result = c.api.AsyncReqSubAllInvestorTrade()
+		p.Release()
+		p = nil
 	}
 
-	if err = result.Await(stream.Context(), hub.apiReqTimeout); err != nil {
-		err = errors.Wrap(err, "sub investor's trade failed")
+	tdFlow := c.api.state.tradeFlow.Load()
 
-		return
-	}
+	subID, ch := tdFlow.Subscribe(
+		c.String(), core.Quick,
+	)
 
-	for td := range result.GetData() {
+	filter := req.GetInvestor()
+
+	for td := range ch {
+		if filter != nil && td.InvestorID != filter.InvestorId {
+			continue
+		}
+
 		stream.Send(service.ConvertTrade(td))
 	}
+
+	err = tdFlow.UnSubscribe(subID)
 
 	return
 }
@@ -439,23 +480,46 @@ func (hub *RiskHub) SubInvestorMoney(req *service.Request, stream service.RohonM
 		return
 	}
 
-	filter := req.GetInvestor()
+	p := channel.NewMemoChannel[*rohon.Account](
+		c.api.ctx, frontToIdentity(c.api.front), 0,
+	)
 
-	result := c.api.AsyncReqSubAllInvestorMoney()
+	if c.api.state.accountFlow.CompareAndSwap(nil, p) {
+		result := c.api.AsyncReqSubAllInvestorMoney()
 
-	if err = result.Await(stream.Context(), hub.apiReqTimeout); err != nil {
-		err = errors.Wrap(err, "sub investor's money failed")
+		if err = result.Await(stream.Context(), hub.apiReqTimeout); err != nil {
+			err = errors.Wrap(err, "sub investor's money failed")
 
-		return
+			return
+		}
+
+		go func() {
+			for acct := range result.GetData() {
+				p.Publish(acct, -1)
+			}
+		}()
+	} else {
+		p.Release()
+		p = nil
 	}
 
-	for acct := range result.GetData() {
+	acctFlow := c.api.state.accountFlow.Load()
+
+	subID, ch := acctFlow.Subscribe(
+		c.String(), core.Quick,
+	)
+
+	filter := req.GetInvestor()
+
+	for acct := range ch {
 		if filter != nil && filter.InvestorId != acct.AccountID {
 			continue
 		}
 
 		stream.Send(service.ConvertAccount(acct))
 	}
+
+	err = acctFlow.UnSubscribe(subID)
 
 	return
 }
@@ -470,26 +534,46 @@ func (hub *RiskHub) SubInvestorPosition(req *service.Request, stream service.Roh
 		return
 	}
 
-	var result rhapi.Result[rohon.Position]
+	p := channel.NewMemoChannel[*rohon.Position](
+		c.api.ctx, frontToIdentity(c.api.front), 0,
+	)
 
-	if inv := req.GetInvestor(); inv != nil {
-		result = c.api.AsyncReqQryInvestorPosition(&rohon.Investor{
-			BrokerID:   inv.BrokerId,
-			InvestorID: inv.InvestorId,
-		}, "")
+	if c.api.state.positionFlow.CompareAndSwap(nil, p) {
+		result := c.api.AsyncReqSubAllInvestorPosition()
+
+		if err = result.Await(stream.Context(), hub.apiReqTimeout); err != nil {
+			err = errors.Wrap(err, "sub investor's postion failed")
+
+			return
+		}
+
+		go func() {
+			for pos := range result.GetData() {
+				p.Publish(pos, -1)
+			}
+		}()
 	} else {
-		result = c.api.AsyncReqSubAllInvestorPosition()
+		p.Release()
+		p = nil
 	}
 
-	if err = result.Await(stream.Context(), hub.apiReqTimeout); err != nil {
-		err = errors.Wrap(err, "sub investor's postion failed")
+	posFlow := c.api.state.positionFlow.Load()
 
-		return
-	}
+	subID, ch := posFlow.Subscribe(
+		c.String(), core.Quick,
+	)
 
-	for pos := range result.GetData() {
+	filter := req.GetInvestor()
+
+	for pos := range ch {
+		if filter != nil && filter.InvestorId != pos.InvestorID {
+			continue
+		}
+
 		stream.Send(service.ConvertPosition(pos))
 	}
+
+	err = posFlow.UnSubscribe(subID)
 
 	return
 }

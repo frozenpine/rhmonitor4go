@@ -2,6 +2,7 @@ package hub
 
 import (
 	"bytes"
+	"context"
 	"strconv"
 	"sync/atomic"
 
@@ -15,9 +16,11 @@ var (
 )
 
 type client struct {
+	ctx   context.Context
 	peer  *peer.Peer
 	api   *grpcRiskApi
 	login atomic.Bool
+	// orderStream
 }
 
 func (c *client) checkConnect() error {
@@ -36,6 +39,10 @@ func (c *client) checkLogin() error {
 	c.login.Store(false)
 
 	return errors.New("[grpc] please login first")
+}
+
+func (c *client) disconnect() {
+	// c.ctx.
 }
 
 func (c *client) String() string {

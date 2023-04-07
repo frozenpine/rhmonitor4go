@@ -7,7 +7,7 @@ require github.com/pkg/errors v0.9.1
 require golang.org/x/text v0.7.0
 
 require (
-	github.com/frozenpine/msgqueue v0.0.1
+	github.com/frozenpine/msgqueue v0.0.2
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/gofrs/uuid v4.3.1+incompatible
 	github.com/gogo/protobuf v1.3.2
