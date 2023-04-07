@@ -175,9 +175,9 @@ func (hub *RiskHub) ReqUserLogin(ctx context.Context, req *service.Request) (res
 
 	result = &service.Result{}
 
-	if err = c.checkConnect(); err != nil {
-		return
-	}
+	// if err = c.checkConnect(); err != nil {
+	// 	return
+	// }
 
 	if c.api.isLoggedIn() {
 		result.ReqId = -1
