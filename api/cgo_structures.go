@@ -1,7 +1,7 @@
 package api
 
 /*
-#cgo CFLAGS: -I${SRCDIR}/include
+#cgo CFLAGS: -I${SRCDIR}/include -I${SRCDIR}/cRHMonitorApi
 
 #include "cRHMonitorApi.h"
 */
@@ -412,3 +412,75 @@ func ToCRHMonitorSubPushInfo(sub *rhmonitor4go.SubInfo) *C.struct_CRHMonitorSubP
 
 	return &data
 }
+
+var instrumentCache = sync.Pool{New: func() any { return new(rhmonitor4go.Instrument) }}
+
+func NewFromCRHInstrumentField(pInstrument *C.struct_CRHMonitorInstrumentField) *rhmonitor4go.Instrument {
+	if pInstrument == nil {
+		return nil
+	}
+
+	ins := instrumentCache.Get().(*rhmonitor4go.Instrument)
+
+	ins.InstrumentID = CStr2GoStr(unsafe.Pointer(&pInstrument.InstrumentID))
+	ins.ExchangeID = CStr2GoStr(unsafe.Pointer(&pInstrument.ExchangeID))
+	ins.InstrumentName = CStr2GoStr(unsafe.Pointer(&pInstrument.InstrumentName))
+	ins.ExchangeInstID = CStr2GoStr(unsafe.Pointer(&pInstrument.ExchangeInstID))
+	ins.ProductID = CStr2GoStr(unsafe.Pointer(&pInstrument.ProductID))
+	ins.ProductClass = rhmonitor4go.ProductClass(pInstrument.ProductClass)
+	ins.DeliveryYear = int(pInstrument.DeliveryYear)
+	ins.DeliveryMonth = int(pInstrument.DeliveryMonth)
+	ins.MaxMarketOrderVolume = int(pInstrument.MaxMarketOrderVolume)
+	ins.MinMarketOrderVolume = int(pInstrument.MinMarketOrderVolume)
+	ins.MaxLimitOrderVolume = int(pInstrument.MaxLimitOrderVolume)
+	ins.MinLimitOrderVolume = int(pInstrument.MinLimitOrderVolume)
+	ins.VolumeMultiple = int(pInstrument.VolumeMultiple)
+	ins.PriceTick = float64(pInstrument.PriceTick)
+	ins.CreateDate = CStr2GoStr(unsafe.Pointer(&pInstrument.CreateDate))
+	ins.OpenDate = CStr2GoStr(unsafe.Pointer(&pInstrument.OpenDate))
+	ins.ExpireDate = CStr2GoStr(unsafe.Pointer(&pInstrument.ExpireDate))
+	ins.StartDelivDate = CStr2GoStr(unsafe.Pointer(&pInstrument.StartDelivDate))
+	ins.EndDelivDate = CStr2GoStr(unsafe.Pointer(&pInstrument.EndDelivDate))
+	ins.InstLiftPhase = rhmonitor4go.InstLifePhase(pInstrument.InstLifePhase)
+	if pInstrument.IsTrading > 0 {
+		ins.IsTrading = true
+	}
+	ins.PositionType = rhmonitor4go.PositionType(pInstrument.PositionType)
+	ins.PositionDateType = rhmonitor4go.PositionDateType(pInstrument.PositionDateType)
+	ins.LongMarginRatioByMoney = float64(pInstrument.LongMarginRatioByMoney)
+	ins.LongMarginRatioByVolume = float64(pInstrument.LongMarginRatioByVolume)
+	ins.ShortMarginRatioByMoney = float64(pInstrument.ShortMarginRatioByMoney)
+	ins.ShortMarginRatioByVolume = float64(pInstrument.ShortMarginRatioByVolume)
+	ins.AfternoonMarginRatioByMoney = float64(pInstrument.AfternoonMarginRatioByMoney)
+	ins.AfternoonMarginRatioByVolume = float64(pInstrument.AfternoonMarginRatioByVolume)
+	ins.OvernightMarginRatioByMoney = float64(pInstrument.OvernightMarginRatioByMoney)
+	ins.OvernightMarginRatioByVolume = float64(pInstrument.OvernightMarginRatioByVolume)
+	if pInstrument.MarginIsRelative > 0 {
+		ins.MarginIsRelative = true
+	}
+	ins.OpenRatioByMoney = float64(pInstrument.OpenRatioByMoney)
+	ins.OpenRatioByVolume = float64(pInstrument.OpenRatioByVolume)
+	ins.CloseRatioByMoney = float64(pInstrument.CloseRatioByMoney)
+	ins.CloseRatioByVolume = float64(pInstrument.CloseRatioByVolume)
+	ins.CloseTodayRatioByMoney = float64(pInstrument.CloseTodayRatioByMoney)
+	ins.CloseTodayRatioByVolume = float64(pInstrument.CloseTodayRatioByVolume)
+	ins.UnderlyingInstID = CStr2GoStr(unsafe.Pointer(&pInstrument.UnderlyinginstrID))
+	ins.StrikePrice = float64(pInstrument.StrikePrice)
+	ins.OptionsType = rhmonitor4go.OptionsType(pInstrument.OptionsType)
+	ins.UnderlyingMultiple = float64(pInstrument.UnderlyingMultiple)
+	ins.CombinationType = rhmonitor4go.CombinationType(pInstrument.CombinationType)
+
+	return ins
+}
+
+// func ToCRHQryOrderField(qry *rhmonitor4go.QryOrder) *C.struct_CRHQryOrderField {
+// 	data := C.struct_CRHQryOrderField{}
+
+// 	C.memcpy(
+// 		unsafe.Pointer(&data.BrokerID),
+// 		unsafe.Pointer(C.CString(qry.BrokerID)),
+// 		C.sizeof_TRHBrokerIDType-1,
+// 	)
+
+// 	return &data
+// }

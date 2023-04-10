@@ -1,7 +1,7 @@
 package api
 
 /*
-#cgo CFLAGS: -I${SRCDIR}/include
+#cgo CFLAGS: -I${SRCDIR}/include -I${SRCDIR}/cRHMonitorApi
 
 #include "cRHMonitorApi.h"
 
@@ -79,6 +79,30 @@ void cgoOnRtnInvestorPosition
 	struct CRHMonitorPositionField *pRohonMonitorPositionField
 );
 
+void cgoOnRspQryOrder
+(
+	CRHMonitorInstance instance,
+	struct CRHOrderField *pOrder,
+	struct CRHRspInfoField *pRspInfo,
+	int nRequestID, bool bIsLast
+);
+
+void cgoOnRspQryTrade
+(
+	CRHMonitorInstance instance,
+	struct CRHTradeField *pTrade,
+	struct CRHRspInfoField *pRspInfo,
+	int nRequestID, bool bIsLast
+);
+
+void cgoOnRspQryInstrument
+(
+	CRHMonitorInstance instance,
+	struct CRHMonitorInstrumentField *pRHMonitorInstrumentField,
+	struct CRHRspInfoField *pRspInfo,
+	int nRequestID, bool bIsLast
+);
+
 */
 import "C"
 
@@ -105,6 +129,9 @@ var (
 		cOnRtnTrade:               C.CbOnRtnTrade(C.cgoOnRtnTrade),
 		cOnRtnInvestorMoney:       C.CbOnRtnInvestorMoney(C.cgoOnRtnInvestorMoney),
 		cOnRtnInvestorPosition:    C.CbOnRtnInvestorPosition(C.cgoOnRtnInvestorPosition),
+		cOnRspQryOrder:            C.CbOnRspQryOrder(C.cgoOnRspQryOrder),
+		cOnRspQryTrade:            C.CbOnRspQryTrade(C.cgoOnRspQryTrade),
+		cOnRspQryInstrument:       C.CbOnRspQryInstrument(C.cgoOnRspQryInstrument),
 	}
 )
 
@@ -121,6 +148,9 @@ type RHRiskSpi interface {
 	OnRtnTrade(*rhmonitor4go.Trade)
 	OnRtnInvestorMoney(*rhmonitor4go.Account)
 	OnRtnInvestorPosition(*rhmonitor4go.Position)
+	OnRspQryOrder(*rhmonitor4go.Order, *rhmonitor4go.RspInfo, int64, bool)
+	OnRspQryTrade(*rhmonitor4go.Trade, *rhmonitor4go.RspInfo, int64, bool)
+	OnRspQryInstrument(*rhmonitor4go.Instrument, *rhmonitor4go.RspInfo, int64, bool)
 }
 
 func getSpiInstance(instance C.CRHMonitorInstance) (api RHRiskSpi) {
@@ -271,4 +301,49 @@ func RegisterRHRiskSpi(instance C.CRHMonitorInstance, spi RHRiskSpi) {
 		C.SetCallbacks(instance, &callbacks)
 		spiCache[instance] = spi
 	}
+}
+
+//export cgoOnRspQryOrder
+func cgoOnRspQryOrder(
+	instance C.CRHMonitorInstance,
+	pOrder *C.struct_CRHOrderField,
+	pRHRspInfoField *C.struct_CRHRspInfoField,
+	nRequestID C.int, isLast C.bool,
+) {
+	ord := NewFromCRHOrderField(pOrder)
+	info := NewFromCRHRspInfoField(pRHRspInfoField)
+
+	getSpiInstance(instance).OnRspQryOrder(
+		ord, info, int64(nRequestID), bool(isLast),
+	)
+}
+
+//export cgoOnRspQryTrade
+func cgoOnRspQryTrade(
+	instance C.CRHMonitorInstance,
+	pTrade *C.struct_CRHTradeField,
+	pRspInfo *C.struct_CRHRspInfoField,
+	nRequestID C.int, bIsLast C.bool,
+) {
+	td := NewFromCRHTradeField(pTrade)
+	info := NewFromCRHRspInfoField(pRspInfo)
+
+	getSpiInstance(instance).OnRspQryTrade(
+		td, info, int64(nRequestID), bool(bIsLast),
+	)
+}
+
+//export cgoOnRspQryInstrument
+func cgoOnRspQryInstrument(
+	instance C.CRHMonitorInstance,
+	pRHMonitorInstrumentField *C.struct_CRHMonitorInstrumentField,
+	pRspInfo *C.struct_CRHRspInfoField,
+	nRequestID C.int, bIsLast C.bool,
+) {
+	ins := NewFromCRHInstrumentField(pRHMonitorInstrumentField)
+	info := NewFromCRHRspInfoField(pRspInfo)
+
+	getSpiInstance(instance).OnRspQryInstrument(
+		ins, info, int64(nRequestID), bool(bIsLast),
+	)
 }

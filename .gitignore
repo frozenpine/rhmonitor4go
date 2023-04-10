@@ -33,3 +33,6 @@ examples/rhmonitor/rhmonitor*
 **/*.crt
 **/*.cert
 **/*.key
+
+api/libs/Release
+api/libs/Debug

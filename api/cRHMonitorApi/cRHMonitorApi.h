@@ -120,6 +120,30 @@ extern "C"
     typedef void(APPWINAPI *CbOnRtnInvestorPosition)(CRHMonitorInstance instance, struct CRHMonitorPositionField *pRohonMonitorPositionField);
     C_API void SetCbOnRtnInvestorPosition(CRHMonitorInstance instance, CbOnRtnInvestorPosition handler);
 
+    /// 查询报单响应
+    typedef void(APPWINAPI *CbOnRspQryOrder)(
+        CRHMonitorInstance instance,
+        struct CRHOrderField *pOrder,
+        struct CRHRspInfoField *pRspInfo,
+        int nRequestID, bool bIsLast);
+    C_API void SetCbOnRspQryOrder(CRHMonitorInstance instance, CbOnRspQryOrder handler);
+
+    /// 请求查询所有成交回报响应
+    typedef void(APPWINAPI *CbOnRspQryTrade)(
+        CRHMonitorInstance instance,
+        struct CRHTradeField *pTrade,
+        struct CRHRspInfoField *pRspInfo,
+        int nRequestID, bool bIsLast);
+    C_API void SetCbOnRspQryTrade(CRHMonitorInstance instance, CbOnRspQryTrade handler);
+
+    /// 查询合约信息响应
+    typedef void(APPWINAPI *CbOnRspQryInstrument)(
+        CRHMonitorInstance instance,
+        struct CRHMonitorInstrumentField *pRHMonitorInstrumentField,
+        struct CRHRspInfoField *pRspInfo,
+        int nRequestID, bool bIsLast);
+    C_API void SetCbOnRspQryInstrument(CRHMonitorInstance instance, CbOnRspQryInstrument handler);
+
     typedef struct CbVirtualTable
     {
         CbOnFrontConnected cOnFrontConnected;
@@ -134,6 +158,9 @@ extern "C"
         CbOnRtnTrade cOnRtnTrade;
         CbOnRtnInvestorMoney cOnRtnInvestorMoney;
         CbOnRtnInvestorPosition cOnRtnInvestorPosition;
+        CbOnRspQryOrder cOnRspQryOrder;
+        CbOnRspQryTrade cOnRspQryTrade;
+        CbOnRspQryInstrument cOnRspQryInstrument;
     } callback_t;
 
     C_API void SetCallbacks(CRHMonitorInstance instance, callback_t *vt);
@@ -168,6 +195,15 @@ extern "C"
 
     // 订阅主动推送信息
     C_API int ReqSubPushInfo(CRHMonitorInstance instance, struct CRHMonitorSubPushInfo *pInfo, int nRequestID);
+
+    // 查询操作账户当日委托记录，当前只支持查询操作账户，BrokerID置空
+    C_API int ReqQryOrder(CRHMonitorInstance instance, struct CRHQryOrderField *pQryOrder, int nRequestID);
+
+    // 查询操作账户当日成交记录，当前只支持查询操作账户，BrokerID置空
+    C_API int ReqQryTrade(CRHMonitorInstance instance, struct CRHQryTradeField *pQryTrade, int nRequestID);
+
+    /// 查询合约信息,默认合约不填写查所有合约
+    C_API int ReqQryInstrument(CRHMonitorInstance instance, struct CRHMonitorInstrumentField *pQryInstrumentField, int nRequestID);
 
 #ifdef __cplusplus
 }

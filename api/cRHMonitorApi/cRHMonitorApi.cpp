@@ -106,6 +106,21 @@ public:
         vtCallbacks.cOnRtnInvestorPosition = handler;
     }
 
+    void SetCbOnRspQryOrder(CbOnRspQryOrder handler)
+    {
+        vtCallbacks.cOnRspQryOrder = handler;
+    }
+
+    void SetCbOnRspQryTrade(CbOnRspQryTrade handler)
+    {
+        vtCallbacks.cOnRspQryTrade = handler;
+    }
+
+    void SetCbOnRspQryInstrument(CbOnRspQryInstrument handler)
+    {
+        vtCallbacks.cOnRspQryInstrument = handler;
+    }
+
     /// 初始化
     ///@remark 初始化运行环境,只有调用后,接口才开始工作
     void
@@ -156,6 +171,24 @@ public:
         return pApi->ReqSubPushInfo(pInfo, nRequestID);
     };
 
+    // 查询操作账户当日委托记录，当前只支持查询操作账户，BrokerID置空
+    int ReqQryOrder(CRHQryOrderField *pQryOrder, int nRequestID)
+    {
+        return pApi->ReqQryOrder(pQryOrder, nRequestID);
+    };
+
+    // 查询操作账户当日成交记录，当前只支持查询操作账户，BrokerID置空
+    int ReqQryTrade(CRHQryTradeField *pQryTrade, int nRequestID)
+    {
+        return pApi->ReqQryTrade(pQryTrade, nRequestID);
+    }
+
+    /// 查询合约信息,默认合约不填写查所有合约
+    int ReqQryInstrument(CRHMonitorInstrumentField *pQryInstrumentField, int nRequestID)
+    {
+        return pApi->ReqQryInstrument(pQryInstrumentField, nRequestID);
+    }
+
     /// 当客户端与交易后台建立起通信连接时（还未登录前），该方法被调用。
     void OnFrontConnected()
     {
@@ -174,77 +207,98 @@ public:
     ///         0x2003 收到错误报文
     void OnFrontDisconnected(int nReason)
     {
-        if (!vtCallbacks.cOnFrontDisconnected) return;
+        if (!vtCallbacks.cOnFrontDisconnected)
+            return;
 
         vtCallbacks.cOnFrontDisconnected(CRHMonitorInstance(this), nReason);
     };
 
     /// 风控账户登陆响应
-    void OnRspUserLogin(CRHMonitorRspUserLoginField *pRspUserLoginField, CRHRspInfoField *pRHRspInfoField, int nRequestID){
-        if (!vtCallbacks.cOnRspUserLogin) return;
+    void OnRspUserLogin(CRHMonitorRspUserLoginField *pRspUserLoginField, CRHRspInfoField *pRHRspInfoField, int nRequestID)
+    {
+        if (!vtCallbacks.cOnRspUserLogin)
+            return;
 
         vtCallbacks.cOnRspUserLogin(CRHMonitorInstance(this), pRspUserLoginField, pRHRspInfoField, nRequestID);
     };
 
     /// 风控账户登出响应
-    void OnRspUserLogout(CRHMonitorUserLogoutField *pRspUserLogoutField, CRHRspInfoField *pRHRspInfoField, int nRequestID){
-        if (!vtCallbacks.cOnRspUserLogout) return;
+    void OnRspUserLogout(CRHMonitorUserLogoutField *pRspUserLogoutField, CRHRspInfoField *pRHRspInfoField, int nRequestID)
+    {
+        if (!vtCallbacks.cOnRspUserLogout)
+            return;
 
         vtCallbacks.cOnRspUserLogout(CRHMonitorInstance(this), pRspUserLogoutField, pRHRspInfoField, nRequestID);
     };
 
     // 查询监控账户响应
-    void OnRspQryMonitorAccounts(CRHQryInvestorField *pRspMonitorUser, CRHRspInfoField *pRHRspInfoField, int nRequestID, bool isLast){
-        if (!vtCallbacks.cOnRspQryMonitorAccounts) return;
+    void OnRspQryMonitorAccounts(CRHQryInvestorField *pRspMonitorUser, CRHRspInfoField *pRHRspInfoField, int nRequestID, bool isLast)
+    {
+        if (!vtCallbacks.cOnRspQryMonitorAccounts)
+            return;
 
         vtCallbacks.cOnRspQryMonitorAccounts(CRHMonitorInstance(this), pRspMonitorUser, pRHRspInfoField, nRequestID, isLast);
     };
 
     /// 查询账户资金响应
-    void OnRspQryInvestorMoney(CRHTradingAccountField *pRHTradingAccountField, CRHRspInfoField *pRHRspInfoField, int nRequestID, bool isLast){
-        if (!vtCallbacks.cOnRspQryInvestorMoney) return;
+    void OnRspQryInvestorMoney(CRHTradingAccountField *pRHTradingAccountField, CRHRspInfoField *pRHRspInfoField, int nRequestID, bool isLast)
+    {
+        if (!vtCallbacks.cOnRspQryInvestorMoney)
+            return;
 
         vtCallbacks.cOnRspQryInvestorMoney(CRHMonitorInstance(this), pRHTradingAccountField, pRHRspInfoField, nRequestID, isLast);
     };
 
     /// 查询账户持仓信息响应
-    void OnRspQryInvestorPosition(CRHMonitorPositionField *pRHMonitorPositionField, CRHRspInfoField *pRHRspInfoField, int nRequestID, bool isLast){
-        if (!vtCallbacks.cOnRspQryInvestorPosition) return;
+    void OnRspQryInvestorPosition(CRHMonitorPositionField *pRHMonitorPositionField, CRHRspInfoField *pRHRspInfoField, int nRequestID, bool isLast)
+    {
+        if (!vtCallbacks.cOnRspQryInvestorPosition)
+            return;
 
         vtCallbacks.cOnRspQryInvestorPosition(CRHMonitorInstance(this), pRHMonitorPositionField, pRHRspInfoField, nRequestID, isLast);
     };
 
     // 平仓指令发送失败时的响应
-    void OnRspOffsetOrder(CRHMonitorOffsetOrderField *pMonitorOrderField, CRHRspInfoField *pRHRspInfoField, int nRequestID, bool isLast){
-        if (!vtCallbacks.cOnRspOffsetOrder) return;
+    void OnRspOffsetOrder(CRHMonitorOffsetOrderField *pMonitorOrderField, CRHRspInfoField *pRHRspInfoField, int nRequestID, bool isLast)
+    {
+        if (!vtCallbacks.cOnRspOffsetOrder)
+            return;
 
         vtCallbacks.cOnRspOffsetOrder(CRHMonitorInstance(this), pMonitorOrderField, pRHRspInfoField, nRequestID, isLast);
     };
 
     /// 报单通知
-    void OnRtnOrder(CRHOrderField *pOrder){
-        if (!vtCallbacks.cOnRtnOrder) return;
+    void OnRtnOrder(CRHOrderField *pOrder)
+    {
+        if (!vtCallbacks.cOnRtnOrder)
+            return;
 
         vtCallbacks.cOnRtnOrder(CRHMonitorInstance(this), pOrder);
     };
 
     /// 成交通知
-    void OnRtnTrade(CRHTradeField *pTrade){
-        if (!vtCallbacks.cOnRtnTrade) return;
+    void OnRtnTrade(CRHTradeField *pTrade)
+    {
+        if (!vtCallbacks.cOnRtnTrade)
+            return;
 
         vtCallbacks.cOnRtnTrade(CRHMonitorInstance(this), pTrade);
     };
 
     /// 账户资金发生变化回报
-    void OnRtnInvestorMoney(CRHTradingAccountField *pRohonTradingAccountField){
-        if (!vtCallbacks.cOnRtnInvestorMoney) return;
+    void OnRtnInvestorMoney(CRHTradingAccountField *pRohonTradingAccountField)
+    {
+        if (!vtCallbacks.cOnRtnInvestorMoney)
+            return;
 
         vtCallbacks.cOnRtnInvestorMoney(CRHMonitorInstance(this), pRohonTradingAccountField);
     };
 
     /// 账户某合约持仓回报
-    void OnRtnInvestorPosition(CRHMonitorPositionField *pRohonMonitorPositionField){
-        if (!vtCallbacks.cOnRtnInvestorPosition) return;
+    void OnRtnInvestorPosition(CRHMonitorPositionField *pRohonMonitorPositionField)
+    {
+        if (!vtCallbacks.cOnRtnInvestorPosition)
+            return;
 
         vtCallbacks.cOnRtnInvestorPosition(CRHMonitorInstance(this), pRohonMonitorPositionField);
     };
@@ -317,6 +371,21 @@ extern "C"
         return ((cRHMonitorApi *)instance)->ReqSubPushInfo(pInfo, nRequestID);
     }
 
+    C_API int ReqQryOrder(CRHMonitorInstance instance, CRHQryOrderField *pQryOrder, int nRequestID)
+    {
+        return ((cRHMonitorApi *)instance)->ReqQryOrder(pQryOrder, nRequestID);
+    }
+
+    C_API int ReqQryTrade(CRHMonitorInstance instance, CRHQryTradeField *pQryTrade, int nRequestID)
+    {
+        return ((cRHMonitorApi *)instance)->ReqQryTrade(pQryTrade, nRequestID);
+    }
+
+    C_API int ReqQryInstrument(CRHMonitorInstance instance, CRHMonitorInstrumentField *pQryInstrumentField, int nRequestID)
+    {
+        return ((cRHMonitorApi *)instance)->ReqQryInstrument(pQryInstrumentField, nRequestID);
+    }
+
     C_API void SetCallbacks(CRHMonitorInstance instance, callback_t *vt)
     {
         ((cRHMonitorApi *)instance)->SetCallback(vt);
@@ -380,6 +449,21 @@ extern "C"
     C_API void SetCbOnRtnInvestorPosition(CRHMonitorInstance instance, CbOnRtnInvestorPosition handler)
     {
         ((cRHMonitorApi *)instance)->SetCbOnRtnInvestorPosition(handler);
+    }
+
+    C_API void SetCbOnRspQryOrder(CRHMonitorInstance instance, CbOnRspQryOrder handler)
+    {
+        return ((cRHMonitorApi *)instance)->SetCbOnRspQryOrder(handler);
+    }
+
+    C_API void SetCbOnRspQryTrade(CRHMonitorInstance instance, CbOnRspQryTrade handler)
+    {
+        return ((cRHMonitorApi *)instance)->SetCbOnRspQryTrade(handler);
+    }
+
+    C_API void SetCbOnRspQryInstrument(CRHMonitorInstance instance, CbOnRspQryInstrument handler)
+    {
+        return ((cRHMonitorApi *)instance)->SetCbOnRspQryInstrument(handler);
     }
 
 #ifdef __cplusplus

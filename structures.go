@@ -401,3 +401,74 @@ type SubInfo struct {
 	BrokerID    string
 	SubInfoType SubInfoType
 }
+
+type QryOrder struct {
+	BrokerID        string
+	InvestorID      string
+	InstrumentID    string
+	ExchangeID      string
+	OrderSysID      string
+	InsertTimeStart string
+	InsertTimeEnd   string
+	InvestUnitID    string
+	FrontID         int
+	SessionID       int
+	OrderRef        string
+}
+
+type QryTrade struct {
+	BrokerID        string
+	InvestorID      string
+	InstrumentID    string
+	ExchangeID      string
+	TradeID         string
+	InsertTimeStart string
+	InsertTimeEnd   string
+	InvestUnitID    string
+}
+
+type Instrument struct {
+	InstrumentID                 string
+	ExchangeID                   string
+	InstrumentName               string
+	ExchangeInstID               string
+	ProductID                    string
+	ProductClass                 ProductClass
+	DeliveryYear                 int
+	DeliveryMonth                int
+	MaxMarketOrderVolume         int
+	MinMarketOrderVolume         int
+	MaxLimitOrderVolume          int
+	MinLimitOrderVolume          int
+	VolumeMultiple               int
+	PriceTick                    float64
+	CreateDate                   string
+	OpenDate                     string
+	ExpireDate                   string
+	StartDelivDate               string
+	EndDelivDate                 string
+	InstLiftPhase                InstLifePhase
+	IsTrading                    bool
+	PositionType                 PositionType
+	PositionDateType             PositionDateType
+	LongMarginRatioByMoney       float64
+	LongMarginRatioByVolume      float64
+	ShortMarginRatioByMoney      float64
+	ShortMarginRatioByVolume     float64
+	AfternoonMarginRatioByMoney  float64
+	AfternoonMarginRatioByVolume float64
+	OvernightMarginRatioByMoney  float64
+	OvernightMarginRatioByVolume float64
+	MarginIsRelative             bool
+	OpenRatioByMoney             float64
+	OpenRatioByVolume            float64
+	CloseRatioByMoney            float64
+	CloseRatioByVolume           float64
+	CloseTodayRatioByMoney       float64
+	CloseTodayRatioByVolume      float64
+	UnderlyingInstID             string
+	StrikePrice                  float64
+	OptionsType                  OptionsType
+	UnderlyingMultiple           float64
+	CombinationType              CombinationType
+}

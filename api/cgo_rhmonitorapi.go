@@ -1,7 +1,7 @@
 package api
 
 /*
-#cgo CFLAGS: -I${SRCDIR}/include
+#cgo CFLAGS: -I${SRCDIR}/include -I${SRCDIR}/cRHMonitorApi
 #cgo LDFLAGS: -L${SRCDIR}/libs -lcRHMonitorApi
 
 #include "cRHMonitorApi.h"
@@ -42,7 +42,8 @@ func CheckRspInfo(info *rhmonitor4go.RspInfo) error {
 func printData[
 	T rhmonitor4go.Investor | rhmonitor4go.Account |
 		rhmonitor4go.Order | rhmonitor4go.Trade |
-		rhmonitor4go.Position | rhmonitor4go.OffsetOrder,
+		rhmonitor4go.Position | rhmonitor4go.OffsetOrder |
+		rhmonitor4go.Instrument,
 ](inter string, data *T) {
 	if data != nil {
 		fmt.Printf("%s %s: %+v\n", inter, reflect.TypeOf(data), data)
@@ -62,6 +63,7 @@ type RHRiskApi interface {
 	Release()
 }
 
+// TODO: 新的order，trade，instrument查询接口
 type RHMonitorApi struct {
 	initOnce    sync.Once
 	releaseOnce sync.Once
@@ -487,6 +489,45 @@ func (api *RHMonitorApi) OnRtnOrder(order *rhmonitor4go.Order) {
 
 func (api *RHMonitorApi) OnRtnTrade(trade *rhmonitor4go.Trade) {
 	printData("OnRtnTrade", trade)
+}
+
+func (api *RHMonitorApi) OnRspQryOrder(order *rhmonitor4go.Order, info *rhmonitor4go.RspInfo, requestID int64, isLast bool) {
+	if err := CheckRspInfo(info); err != nil {
+		log.Printf("Order query failed: %+v", err)
+		return
+	}
+
+	printData("OnRspQryOrder", order)
+
+	if isLast {
+		log.Printf("Query investor[%s]'s order finished.", order.AccountID)
+	}
+}
+
+func (api *RHMonitorApi) OnRspQryTrade(trade *rhmonitor4go.Trade, info *rhmonitor4go.RspInfo, requestID int64, isLast bool) {
+	if err := CheckRspInfo(info); err != nil {
+		log.Printf("Trade query failed: %+v", err)
+		return
+	}
+
+	printData("OnRspQryTrade", trade)
+
+	if isLast {
+		log.Printf("Query investor[%s]'s trade finished.", trade.InvestorID)
+	}
+}
+
+func (api *RHMonitorApi) OnRspQryInstrument(ins *rhmonitor4go.Instrument, info *rhmonitor4go.RspInfo, requestID int64, isLast bool) {
+	if err := CheckRspInfo(info); err != nil {
+		log.Printf("Instrument query failed: %+v", err)
+		return
+	}
+
+	printData("OnRspQryInstrument", ins)
+
+	if isLast {
+		log.Print("Query instrument order finished.")
+	}
 }
 
 // 不进行任何订阅，在进行用户资金查询或其他任何会影响资金变动的操作后，都会推送

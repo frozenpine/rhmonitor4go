@@ -321,3 +321,72 @@ const (
 	RHMonitorSubPushInfoType_Order SubInfoType = 1 << iota // 委托回报
 	RHMonitorSubPushInfoType_Trade                         // 成交回报
 )
+
+type ProductClass uint8
+
+//go:generate stringer -type ProductClass -linecomment
+const (
+	Futures     ProductClass = '1' + iota // 期货
+	Options                               // 期货期权
+	Combination                           // 组合
+	Spot                                  // 现货
+	EFP                                   // 期转现
+	SpotOptions                           // 现货期权
+	TAS                                   // TAS合约
+	Stock                                 // 证券
+	StockIndex                            // 证券指数
+	AimStatus                             // 标的融资融券状态
+	ETFOptions  ProductClass = 'e'        // ETF期权
+	MI          ProductClass = 'I'        // 金属指数
+)
+
+type InstLifePhase uint8
+
+//go:generate stringer -type InstLifePhase -linecomment
+const (
+	NotStart InstLifePhase = '0' + iota // 未上市
+	Started                             // 上市
+	Pause                               // 停牌
+	Expired                             // 到期
+)
+
+type PositionType uint8
+
+//go:generate stringer -type PositionType -linecomment
+const (
+	NetPosition   PositionType = '1' + iota // 净持仓
+	GrossPosition                           // 综合持仓
+)
+
+type PositionDateType uint8
+
+//go:generate stringer -type PositionDateType -linecomment
+const (
+	UseHistory   PositionDateType = '1' + iota // 使用历史持仓
+	NoUseHistory                               // 不使用历史持仓
+)
+
+type OptionsType uint8
+
+//go:generate stringer -type OptionsType -linecomment
+const (
+	Call OptionsType = '1' + iota // 看涨
+	Put                           // 看跌
+)
+
+type CombinationType uint8
+
+//go:generate stringer -type CombinationType -linecomment
+const (
+	CombFuture CombinationType = '0' + iota // 期货组合
+	CombBull                                // 垂直价差牛市
+	CombBear                                // 垂直价差熊市
+	CombSTD                                 // 跨式组合
+	CombSTG                                 // 款跨式组合
+	CombPRT                                 // 备兑组合
+	CombCAS                                 // 时间价差组合
+	CombOPL                                 // 期权对锁组合
+	CombBFO                                 // 买备兑组合
+	CombBLS                                 // 买入期权垂直价差组合
+	CombBES                                 // 卖出期权垂直价差组合
+)
