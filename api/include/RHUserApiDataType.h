@@ -3,7 +3,7 @@
 ///@company 上海融航信息技术有限公司
 ///@file RHUserApiDataType.h
 ///@brief 定义了客户端接口使用的业务数据类型
-///20170120 create by Gabe
+/// 20170120 create by Gabe
 /////////////////////////////////////////////////////////////////////////
 
 #ifndef RH_TRADEDATATYPE_H
@@ -17,654 +17,815 @@ enum RH_TE_RESUME_TYPE
 };
 
 /////////////////////////////////////////////////////////////////////////
-///TRHDateType是一个日期类型
+/// TRHDateType是一个日期类型
 /////////////////////////////////////////////////////////////////////////
 typedef char TRHDateType[9];
 
 /////////////////////////////////////////////////////////////////////////
-///TRHTimeType是一个时间类型
+/// TRHTimeType是一个时间类型
 /////////////////////////////////////////////////////////////////////////
 typedef char TRHTimeType[9];
 
 /////////////////////////////////////////////////////////////////////////
-///TRHInvestorIDType是一个投资者代码类型
+/// TRHInvestorIDType是一个投资者代码类型
 /////////////////////////////////////////////////////////////////////////
 typedef char TRHInvestorIDType[13];
 
 /////////////////////////////////////////////////////////////////////////
-///TRHBrokerIDType是一个经纪公司代码类型
+/// TRHBrokerIDType是一个经纪公司代码类型
 /////////////////////////////////////////////////////////////////////////
 typedef char TRHBrokerIDType[11];
 
 /////////////////////////////////////////////////////////////////////////
-///TRHUserIDType是一个用户代码类型
+/// TRHUserIDType是一个用户代码类型
 /////////////////////////////////////////////////////////////////////////
 typedef char TRHUserIDType[16];
 
 /////////////////////////////////////////////////////////////////////////
-///TRHPasswordType是一个密码类型
+/// TRHPasswordType是一个密码类型
 /////////////////////////////////////////////////////////////////////////
 typedef char TRHPasswordType[41];
 
 /////////////////////////////////////////////////////////////////////////
-///TRHProductInfoType是一个产品信息类型
+/// TRHProductInfoType是一个产品信息类型
 /////////////////////////////////////////////////////////////////////////
 typedef char TRHProductInfoType[11];
 
 /////////////////////////////////////////////////////////////////////////
-///TRHProtocolInfoType是一个协议信息类型
+/// TRHProtocolInfoType是一个协议信息类型
 /////////////////////////////////////////////////////////////////////////
 typedef char TRHProtocolInfoType[11];
 
 /////////////////////////////////////////////////////////////////////////
-///TRHBusinessUnitType是一个业务单元类型
+/// TRHBusinessUnitType是一个业务单元类型
 /////////////////////////////////////////////////////////////////////////
 typedef char TRHBusinessUnitType[21];
 
 /////////////////////////////////////////////////////////////////////////
-///TRHMacAddressType是一个Mac地址类型
+/// TRHMacAddressType是一个Mac地址类型
 /////////////////////////////////////////////////////////////////////////
 typedef char TRHMacAddressType[21];
 
 /////////////////////////////////////////////////////////////////////////
-///TRHPasswordTypeType是一个密码类型类型
+/// TRHPasswordTypeType是一个密码类型类型
 /////////////////////////////////////////////////////////////////////////
-///交易密码
+/// 交易密码
 #define RH_TRADE_PWDT_Trade '1'
-///资金密码
+/// 资金密码
 #define RH_TRADE_PWDT_Account '2'
 
 typedef char TRHPasswordTypeType;
 
 /////////////////////////////////////////////////////////////////////////
-///TRHIPAddressType是一个IP地址类型
+/// TRHIPAddressType是一个IP地址类型
 /////////////////////////////////////////////////////////////////////////
 typedef char TRHIPAddressType[16];
 
 /////////////////////////////////////////////////////////////////////////
-///TRHTIDType是一个交易ID类型
+/// TRHTIDType是一个交易ID类型
 /////////////////////////////////////////////////////////////////////////
 typedef int TRHTIDType;
 
 /////////////////////////////////////////////////////////////////////////
-///TRHLoginRemarkType是一个登录备注类型
+/// TRHLoginRemarkType是一个登录备注类型
 /////////////////////////////////////////////////////////////////////////
 typedef char TRHLoginRemarkType[36];
 
 /////////////////////////////////////////////////////////////////////////
-///TRHSystemNameType是一个系统名称类型
+/// TRHSystemNameType是一个系统名称类型
 /////////////////////////////////////////////////////////////////////////
 typedef char TRHSystemNameType[41];
 
 /////////////////////////////////////////////////////////////////////////
-///TRHFrontIDType是一个前置编号类型
+/// TRHFrontIDType是一个前置编号类型
 /////////////////////////////////////////////////////////////////////////
 typedef int TRHFrontIDType;
 
 /////////////////////////////////////////////////////////////////////////
-///TRHSessionIDType是一个会话编号类型
+/// TRHSessionIDType是一个会话编号类型
 /////////////////////////////////////////////////////////////////////////
 typedef int TRHSessionIDType;
 
 /////////////////////////////////////////////////////////////////////////
-///TRHOrderRefType是一个报单引用类型
+/// TRHOrderRefType是一个报单引用类型
 /////////////////////////////////////////////////////////////////////////
 typedef char TRHOrderRefType[13];
 
-//风控账户权限
-///强平权限
+// 风控账户权限
+/// 强平权限
 #define RH_MONITOR_ADMINISTRATOR '0'
-///普通监视权限
+/// 普通监视权限
 #define RH_MONITOR_NOMAL '1'
 
 typedef char TRHPrivilegeType;
 
-//信息查看权限
+// 信息查看权限
 //[0]为全局强平模式, 整数0为不自动强平, 1为自动强平
 //[1]为全局交易模式, 整数0为按资金账户优先级报单, 1为按比例开仓, 2为净头寸模式
 //[2]与PrivilegeType相同
 typedef char TRHInfoPrivilegeType[200];
 
 /////////////////////////////////////////////////////////////////////////
-///TRHErrorIDType是一个错误代码类型
+/// TRHErrorIDType是一个错误代码类型
 /////////////////////////////////////////////////////////////////////////
 typedef int TRHErrorIDType;
 
 /////////////////////////////////////////////////////////////////////////
-///TRHErrorMsgType是一个错误信息类型
+/// TRHErrorMsgType是一个错误信息类型
 /////////////////////////////////////////////////////////////////////////
 typedef char TRHErrorMsgType[81];
 
 /////////////////////////////////////////////////////////////////////////
-///TRHInstrumentIDType是一个合约代码类型
+/// TRHInstrumentIDType是一个合约代码类型
 /////////////////////////////////////////////////////////////////////////
 typedef char TRHInstrumentIDType[31];
 
 /////////////////////////////////////////////////////////////////////////
-///TRHHedgeFlagType是一个投机套保标志类型
+/// TRHHedgeFlagType是一个投机套保标志类型
 /////////////////////////////////////////////////////////////////////////
-///投机
+/// 投机
 #define RH_TRADE_HF_Speculation '1'
-///套利
+/// 套利
 #define RH_TRADE_HF_Arbitrage '2'
-///套保
+/// 套保
 #define RH_TRADE_HF_Hedge '3'
-///做市商
+/// 做市商
 #define RH_TRADE_HF_MarketMaker '5'
 
 typedef char TRHHedgeFlagType;
 
 /////////////////////////////////////////////////////////////////////////
-///TRHDirectionType是一个买卖方向类型
+/// TRHDirectionType是一个买卖方向类型
 /////////////////////////////////////////////////////////////////////////
-///买
+/// 买
 #define RH_TRADE_D_Buy '0'
-///卖
+/// 卖
 #define RH_TRADE_D_Sell '1'
 
 typedef char TRHDirectionType;
 
 /////////////////////////////////////////////////////////////////////////
-///TRHVolumeType是一个数量类型
+/// TRHVolumeType是一个数量类型
 /////////////////////////////////////////////////////////////////////////
 typedef int TRHVolumeType;
 
 /////////////////////////////////////////////////////////////////////////
-///TRHMoneyType是一个资金类型
+/// TRHMoneyType是一个资金类型
 /////////////////////////////////////////////////////////////////////////
 typedef double TRHMoneyType;
 
 /////////////////////////////////////////////////////////////////////////
-///TRHPositionEntryType用于区分返回持仓类型信息
-///昨仓，冻结持仓数量，逐笔开仓均价
+/// TRHPositionEntryType用于区分返回持仓类型信息
+/// 昨仓，冻结持仓数量，逐笔开仓均价
 /////////////////////////////////////////////////////////////////////////
-typedef char	  TRHPositionEntryType;
+typedef char TRHPositionEntryType;
 
 /////////////////////////////////////////////////////////////////////////
-///TRHAccountIDType是一个投资者帐号类型
+/// TRHAccountIDType是一个投资者帐号类型
 /////////////////////////////////////////////////////////////////////////
 typedef char TRHAccountIDType[13];
 
 /////////////////////////////////////////////////////////////////////////
-///TRHSettlementIDType是一个结算编号类型
+/// TRHSettlementIDType是一个结算编号类型
 /////////////////////////////////////////////////////////////////////////
 typedef int TRHSettlementIDType;
 
 /////////////////////////////////////////////////////////////////////////
-///TRHCurrencyIDType是一个币种代码类型
+/// TRHCurrencyIDType是一个币种代码类型
 /////////////////////////////////////////////////////////////////////////
 typedef char TRHCurrencyIDType[4];
 
 /////////////////////////////////////////////////////////////////////////
-///TRHBizTypeType是一个业务类型类型
+/// TRHBizTypeType是一个业务类型类型
 /////////////////////////////////////////////////////////////////////////
-///期货
+/// 期货
 #define RH_TRADE_BZTP_Future '1'
-///证券
+/// 证券
 #define RH_TRADE_BZTP_Stock '2'
 
 typedef char TRHBizTypeType;
 
 /////////////////////////////////////////////////////////////////////////
-///TRHPriceType是一个价格类型
+/// TRHPriceType是一个价格类型
 /////////////////////////////////////////////////////////////////////////
 typedef double TRHPriceType;
 
 /////////////////////////////////////////////////////////////////////////
-///TRHCombOffsetFlagType是一个组合开平标志类型
+/// TRHCombOffsetFlagType是一个组合开平标志类型
 /////////////////////////////////////////////////////////////////////////
 typedef char TRHCombOffsetFlagType[5];
 
 /////////////////////////////////////////////////////////////////////////
-///TRHCombHedgeFlagType是一个组合投机套保标志类型
+/// TRHCombHedgeFlagType是一个组合投机套保标志类型
 /////////////////////////////////////////////////////////////////////////
 typedef char TRHCombHedgeFlagType[5];
 
 /////////////////////////////////////////////////////////////////////////
-///TRHOffsetFlagType是一个开平标志类型
+/// TRHOffsetFlagType是一个开平标志类型
 /////////////////////////////////////////////////////////////////////////
-///开仓
+/// 开仓
 #define RH_TRADE_OF_Open '0'
-///平仓
+/// 平仓
 #define RH_TRADE_OF_Close '1'
-///强平
+/// 强平
 #define RH_TRADE_OF_ForceClose '2'
-///平今
+/// 平今
 #define RH_TRADE_OF_CloseToday '3'
-///平昨
+/// 平昨
 #define RH_TRADE_OF_CloseYesterday '4'
-///强减
+/// 强减
 #define RH_TRADE_OF_ForceOff '5'
-///本地强平
+/// 本地强平
 #define RH_TRADE_OF_LocalForceClose '6'
 
 typedef char TRHOffsetFlagType;
 
 /////////////////////////////////////////////////////////////////////////
-///TRHHedgeFlagType是一个投机套保标志类型
+/// TRHHedgeFlagType是一个投机套保标志类型
 /////////////////////////////////////////////////////////////////////////
-///投机
+/// 投机
 #define RH_TRADE_HF_Speculation '1'
-///套利
+/// 套利
 #define RH_TRADE_HF_Arbitrage '2'
-///套保
+/// 套保
 #define RH_TRADE_HF_Hedge '3'
-///做市商
+/// 做市商
 #define RH_TRADE_HF_MarketMaker '5'
 
 typedef char TRHHedgeFlagType;
 
 /////////////////////////////////////////////////////////////////////////
-///TRHOrderPriceTypeType是一个报单价格条件类型
+/// TRHOrderPriceTypeType是一个报单价格条件类型
 /////////////////////////////////////////////////////////////////////////
-///任意价
+/// 任意价
 #define RH_TRADE_OPT_AnyPrice '1'
-///限价
+/// 限价
 #define RH_TRADE_OPT_LimitPrice '2'
-///最优价
+/// 最优价
 #define RH_TRADE_OPT_BestPrice '3'
-///最新价
+/// 最新价
 #define RH_TRADE_OPT_LastPrice '4'
-///最新价浮动上浮1个ticks
+/// 最新价浮动上浮1个ticks
 #define RH_TRADE_OPT_LastPricePlusOneTicks '5'
-///最新价浮动上浮2个ticks
+/// 最新价浮动上浮2个ticks
 #define RH_TRADE_OPT_LastPricePlusTwoTicks '6'
-///最新价浮动上浮3个ticks
+/// 最新价浮动上浮3个ticks
 #define RH_TRADE_OPT_LastPricePlusThreeTicks '7'
-///卖一价
+/// 卖一价
 #define RH_TRADE_OPT_AskPrice1 '8'
-///卖一价浮动上浮1个ticks
+/// 卖一价浮动上浮1个ticks
 #define RH_TRADE_OPT_AskPrice1PlusOneTicks '9'
-///卖一价浮动上浮2个ticks
+/// 卖一价浮动上浮2个ticks
 #define RH_TRADE_OPT_AskPrice1PlusTwoTicks 'A'
-///卖一价浮动上浮3个ticks
+/// 卖一价浮动上浮3个ticks
 #define RH_TRADE_OPT_AskPrice1PlusThreeTicks 'B'
-///买一价
+/// 买一价
 #define RH_TRADE_OPT_BidPrice1 'C'
-///买一价浮动上浮1个ticks
+/// 买一价浮动上浮1个ticks
 #define RH_TRADE_OPT_BidPrice1PlusOneTicks 'D'
-///买一价浮动上浮2个ticks
+/// 买一价浮动上浮2个ticks
 #define RH_TRADE_OPT_BidPrice1PlusTwoTicks 'E'
-///买一价浮动上浮3个ticks
+/// 买一价浮动上浮3个ticks
 #define RH_TRADE_OPT_BidPrice1PlusThreeTicks 'F'
-///五档价
+/// 五档价
 #define RH_TRADE_OPT_FiveLevelPrice 'G'
-///止损市价 
+/// 止损市价
 #define RH_TRADE_STOPLOSS_MARKET 'H'
-///止损限价
+/// 止损限价
 #define RH_TRADE_STOPLOSS_LIMIT 'I'
-//止损限价
-//长效单
-#define RH_TRADE_GTC_LIMIT		'J'
-//一键锁券
-#define RH_TRADE_STOCK_LEND		'K'
-//融资买入单
-#define RH_TRADE_STOCK_FINANCING_BUY		'L'
-//现券还券单
-#define RH_TRADE_REPAY_STOCK         'M'
-//ETF申购
-#define RH_TRADE_ETF_PURCHASE        'N'
-//ETF赎回
-#define  RH_TRADE_ETF_REDEMPTION     'O'
+// 止损限价
+// 长效单
+#define RH_TRADE_GTC_LIMIT 'J'
+// 一键锁券
+#define RH_TRADE_STOCK_LEND 'K'
+// 融资买入单
+#define RH_TRADE_STOCK_FINANCING_BUY 'L'
+// 现券还券单
+#define RH_TRADE_REPAY_STOCK 'M'
+// ETF申购
+#define RH_TRADE_ETF_PURCHASE 'N'
+// ETF赎回
+#define RH_TRADE_ETF_REDEMPTION 'O'
 typedef char TRHOrderPriceTypeType;
 
 /////////////////////////////////////////////////////////////////////////
-///TRHForceCloseReasonType是一个强平原因类型
+/// TRHForceCloseReasonType是一个强平原因类型
 /////////////////////////////////////////////////////////////////////////
-///非强平
+/// 非强平
 #define RH_TRADE_FCC_NotForceClose '0'
-///资金不足
+/// 资金不足
 #define RH_TRADE_FCC_LackDeposit '1'
-///客户超仓
+/// 客户超仓
 #define RH_TRADE_FCC_ClientOverPositionLimit '2'
-///会员超仓
+/// 会员超仓
 #define RH_TRADE_FCC_MemberOverPositionLimit '3'
-///持仓非整数倍
+/// 持仓非整数倍
 #define RH_TRADE_FCC_NotMultiple '4'
-///违规
+/// 违规
 #define RH_TRADE_FCC_Violation '5'
-///其它
+/// 其它
 #define RH_TRADE_FCC_Other '6'
-///自然人临近交割
+/// 自然人临近交割
 #define RH_TRADE_FCC_PersonDeliv '7'
 
 typedef char TRHForceCloseReasonType;
 
 /////////////////////////////////////////////////////////////////////////
-///TRHOrderTypeType是一个报单类型类型
+/// TRHOrderTypeType是一个报单类型类型
 /////////////////////////////////////////////////////////////////////////
-///正常
+/// 正常
 #define RH_TRADE_ORDT_Normal '0'
-///报价衍生
+/// 报价衍生
 #define RH_TRADE_ORDT_DeriveFromQuote '1'
-///组合衍生
+/// 组合衍生
 #define RH_TRADE_ORDT_DeriveFromCombination '2'
-///组合报单
+/// 组合报单
 #define RH_TRADE_ORDT_Combination '3'
-///条件单
+/// 条件单
 #define RH_TRADE_ORDT_ConditionalOrder '4'
-///互换单
+/// 互换单
 #define RH_TRADE_ORDT_Swap '5'
-///融资买入单
+/// 融资买入单
 #define RH_TRADE_ORDT_FinancingBuy 'A'
-///卖券还款
-#define RH_TRADE_ORDT_SellRepayMoney	'B'
-///融资平仓
+/// 卖券还款
+#define RH_TRADE_ORDT_SellRepayMoney 'B'
+/// 融资平仓
 #define RH_TRADE_ORDT_FinancingSell 'C'
-///现券还券
-#define RH_TRADE_ORDT_RepayStock	'R'
+/// 现券还券
+#define RH_TRADE_ORDT_RepayStock 'R'
 
 typedef char TRHOrderTypeType;
 
 /////////////////////////////////////////////////////////////////////////
-///TRHTimeConditionType是一个有效期类型类型
+/// TRHTimeConditionType是一个有效期类型类型
 /////////////////////////////////////////////////////////////////////////
-///立即完成，否则撤销
+/// 立即完成，否则撤销
 #define RH_TRADE_TC_IOC '1'
-///本节有效
+/// 本节有效
 #define RH_TRADE_TC_GFS '2'
-///当日有效
+/// 当日有效
 #define RH_TRADE_TC_GFD '3'
-///指定日期前有效
+/// 指定日期前有效
 #define RH_TRADE_TC_GTD '4'
-///撤销前有效
+/// 撤销前有效
 #define RH_TRADE_TC_GTC '5'
-///集合竞价有效
+/// 集合竞价有效
 #define RH_TRADE_TC_GFA '6'
 
 typedef char TRHTimeConditionType;
 
 /////////////////////////////////////////////////////////////////////////
-///TRHVolumeConditionType是一个成交量类型类型
+/// TRHVolumeConditionType是一个成交量类型类型
 /////////////////////////////////////////////////////////////////////////
-///任何数量
+/// 任何数量
 #define RH_TRADE_VC_AV '1'
-///最小数量
+/// 最小数量
 #define RH_TRADE_VC_MV '2'
-///全部数量
+/// 全部数量
 #define RH_TRADE_VC_CV '3'
 
 typedef char TRHVolumeConditionType;
 
-
 /////////////////////////////////////////////////////////////////////////
-///TRHBoolType是一个布尔型类型
+/// TRHBoolType是一个布尔型类型
 /////////////////////////////////////////////////////////////////////////
 typedef int TRHBoolType;
 
 /////////////////////////////////////////////////////////////////////////
-///TRHRequestIDType是一个请求编号类型
+/// TRHRequestIDType是一个请求编号类型
 /////////////////////////////////////////////////////////////////////////
 typedef int TRHRequestIDType;
 
 /////////////////////////////////////////////////////////////////////////
-///TRHOrderLocalIDType是一个本地报单编号类型
+/// TRHOrderLocalIDType是一个本地报单编号类型
 /////////////////////////////////////////////////////////////////////////
 typedef char TRHOrderLocalIDType[13];
 
 /////////////////////////////////////////////////////////////////////////
-///TRHExchangeIDType是一个交易所代码类型
+/// TRHExchangeIDType是一个交易所代码类型
 /////////////////////////////////////////////////////////////////////////
 typedef char TRHExchangeIDType[9];
 
 /////////////////////////////////////////////////////////////////////////
-///TRHParticipantIDType是一个会员代码类型
+/// TRHParticipantIDType是一个会员代码类型
 /////////////////////////////////////////////////////////////////////////
 typedef char TRHParticipantIDType[11];
 
 /////////////////////////////////////////////////////////////////////////
-///TRHClientIDType是一个交易编码类型
+/// TRHClientIDType是一个交易编码类型
 /////////////////////////////////////////////////////////////////////////
 typedef char TRHClientIDType[11];
 
 /////////////////////////////////////////////////////////////////////////
-///TRHExchangeInstIDType是一个合约在交易所的代码类型
+/// TRHExchangeInstIDType是一个合约在交易所的代码类型
 /////////////////////////////////////////////////////////////////////////
 typedef char TRHExchangeInstIDType[31];
 
 /////////////////////////////////////////////////////////////////////////
-///TRHTraderIDType是一个交易所交易员代码类型
+/// TRHTraderIDType是一个交易所交易员代码类型
 /////////////////////////////////////////////////////////////////////////
 typedef char TRHTraderIDType[21];
 
 /////////////////////////////////////////////////////////////////////////
-///TRHInstallIDType是一个安装编号类型
+/// TRHInstallIDType是一个安装编号类型
 /////////////////////////////////////////////////////////////////////////
 typedef int TRHInstallIDType;
 
 /////////////////////////////////////////////////////////////////////////
-///TRHOrderSubmitStatusType是一个报单提交状态类型
+/// TRHOrderSubmitStatusType是一个报单提交状态类型
 /////////////////////////////////////////////////////////////////////////
-///已经提交
+/// 已经提交
 #define RH_TRADE_OSS_InsertSubmitted '0'
-///撤单已经提交
+/// 撤单已经提交
 #define RH_TRADE_OSS_CancelSubmitted '1'
-///修改已经提交
+/// 修改已经提交
 #define RH_TRADE_OSS_ModifySubmitted '2'
-///已经接受
+/// 已经接受
 #define RH_TRADE_OSS_Accepted '3'
-///报单已经被拒绝
+/// 报单已经被拒绝
 #define RH_TRADE_OSS_InsertRejected '4'
-///撤单已经被拒绝
+/// 撤单已经被拒绝
 #define RH_TRADE_OSS_CancelRejected '5'
-///改单已经被拒绝
+/// 改单已经被拒绝
 #define RH_TRADE_OSS_ModifyRejected '6'
 
 typedef char TRHOrderSubmitStatusType;
 
 /////////////////////////////////////////////////////////////////////////
-///TRHSequenceNoType是一个序号类型
+/// TRHSequenceNoType是一个序号类型
 /////////////////////////////////////////////////////////////////////////
 typedef int TRHSequenceNoType;
 
 /////////////////////////////////////////////////////////////////////////
-///TRHOrderSysIDType是一个报单编号类型
+/// TRHOrderSysIDType是一个报单编号类型
 /////////////////////////////////////////////////////////////////////////
 typedef char TRHOrderSysIDType[21];
 
 /////////////////////////////////////////////////////////////////////////
-///TRHOrderSourceType是一个报单来源类型
+/// TRHOrderSourceType是一个报单来源类型
 /////////////////////////////////////////////////////////////////////////
-///来自参与者
+/// 来自参与者
 #define RH_TRADE_OSRC_Participant '0'
-///来自管理员
+/// 来自管理员
 #define RH_TRADE_OSRC_Administrator '1'
-///查询报单
+/// 查询报单
 #define RH_TRADE_OSRC_QryOrder '2'
 
-///来自于风控的强平单
-#define RH_TRADE_OSRC_MonitorForceOrder	'3'
-///触发风险后的强平单
-#define RH_TRADE_OSRC_RiskForceOrder		'4'
-///风控端第三方报单
-#define RH_TRADE_OSRC_MonitorThirdOrder	'5'
-///资金账户外部报单后自动映射的报单
-#define RH_TRADE_OSRC_RealObjThirdOrder	'6'
-///服务器条件单
-#define RH_TRADE_OSRC_ServerCondiOrder	'7'
-///服务器止损单
-#define RH_TRADE_OSRC_ServerLossOrder	'8'
-///服务器止盈单
-#define RH_TRADE_OSRC_ServerProfitOrder	'9'
-///服务器止损追单
-#define RH_TRADE_OSRC_ServerLossEnsureOrder	'a'
-///服务器止盈追单
-#define RH_TRADE_OSRC_ServerProfitEnsureOrder	'b'
-///服务器预埋单
-#define RH_TRADE_OSRC_ServerParkedOrder	'c'
+/// 来自于风控的强平单
+#define RH_TRADE_OSRC_MonitorForceOrder '3'
+/// 触发风险后的强平单
+#define RH_TRADE_OSRC_RiskForceOrder '4'
+/// 风控端第三方报单
+#define RH_TRADE_OSRC_MonitorThirdOrder '5'
+/// 资金账户外部报单后自动映射的报单
+#define RH_TRADE_OSRC_RealObjThirdOrder '6'
+/// 服务器条件单
+#define RH_TRADE_OSRC_ServerCondiOrder '7'
+/// 服务器止损单
+#define RH_TRADE_OSRC_ServerLossOrder '8'
+/// 服务器止盈单
+#define RH_TRADE_OSRC_ServerProfitOrder '9'
+/// 服务器止损追单
+#define RH_TRADE_OSRC_ServerLossEnsureOrder 'a'
+/// 服务器止盈追单
+#define RH_TRADE_OSRC_ServerProfitEnsureOrder 'b'
+/// 服务器预埋单
+#define RH_TRADE_OSRC_ServerParkedOrder 'c'
 
 typedef char TRHOrderSourceType;
 
 /////////////////////////////////////////////////////////////////////////
-///TRHOrderStatusType是一个报单状态类型
+/// TRHOrderStatusType是一个报单状态类型
 /////////////////////////////////////////////////////////////////////////
-///全部成交
+/// 全部成交
 #define RH_TRADE_OST_AllTraded '0'
-///部分成交还在队列中
+/// 部分成交还在队列中
 #define RH_TRADE_OST_PartTradedQueueing '1'
-///部分成交不在队列中
+/// 部分成交不在队列中
 #define RH_TRADE_OST_PartTradedNotQueueing '2'
-///未成交还在队列中
+/// 未成交还在队列中
 #define RH_TRADE_OST_NoTradeQueueing '3'
-///未成交不在队列中
+/// 未成交不在队列中
 #define RH_TRADE_OST_NoTradeNotQueueing '4'
-///撤单
+/// 撤单
 #define RH_TRADE_OST_Canceled '5'
-///未知
+/// 未知
 #define RH_TRADE_OST_Unknown 'a'
-///尚未触发
+/// 尚未触发
 #define RH_TRADE_OST_NotTouched 'b'
-///已触发
+/// 已触发
 #define RH_TRADE_OST_Touched 'c'
-///已提交
+/// 已提交
 #define RH_TRADE_OST_Submitted 'd'
-///正在修改
+/// 正在修改
 #define RH_TRADE_OST_Amending 'm'
 
 typedef char TRHOrderStatusType;
 
 /////////////////////////////////////////////////////////////////////////
-///TRHBranchIDType是一个营业部编号类型
+/// TRHBranchIDType是一个营业部编号类型
 /////////////////////////////////////////////////////////////////////////
 typedef char TRHBranchIDType[9];
 
 /////////////////////////////////////////////////////////////////////////
-///TRHInvestUnitIDType是一个投资单元代码类型
+/// TRHInvestUnitIDType是一个投资单元代码类型
 /////////////////////////////////////////////////////////////////////////
 typedef char TRHInvestUnitIDType[17];
 
 /////////////////////////////////////////////////////////////////////////
-///TRHTradeIDType是一个成交编号类型
+/// TRHTradeIDType是一个成交编号类型
 /////////////////////////////////////////////////////////////////////////
 typedef char TRHTradeIDType[21];
 
 /////////////////////////////////////////////////////////////////////////
-///TRHTradingRoleType是一个交易角色类型
+/// TRHTradingRoleType是一个交易角色类型
 /////////////////////////////////////////////////////////////////////////
-///代理
+/// 代理
 #define RH_TRADE_ER_Broker '1'
-///自营
+/// 自营
 #define RH_TRADE_ER_Host '2'
-///做市商
+/// 做市商
 #define RH_TRADE_ER_Maker '3'
 
 typedef char TRHTradingRoleType;
 
 /////////////////////////////////////////////////////////////////////////
-///TRHTradeTypeType是一个成交类型类型
+/// TRHTradeTypeType是一个成交类型类型
 /////////////////////////////////////////////////////////////////////////
-///组合持仓拆分为单一持仓,初始化不应包含该类型的持仓
+/// 组合持仓拆分为单一持仓,初始化不应包含该类型的持仓
 #define RH_TRADE_TRDT_SplitCombination '#'
-///普通成交
+/// 普通成交
 #define RH_TRADE_TRDT_Common '0'
-///期权执行
+/// 期权执行
 #define RH_TRADE_TRDT_OptionsExecution '1'
-///OTC成交
+/// OTC成交
 #define RH_TRADE_TRDT_OTC '2'
-///期转现衍生成交
+/// 期转现衍生成交
 #define RH_TRADE_TRDT_EFPDerived '3'
-///组合衍生成交
+/// 组合衍生成交
 #define RH_TRADE_TRDT_CombinationDerived '4'
-///融资买入成交(融资融券)
+/// 融资买入成交(融资融券)
 #define RH_TRADE_TRDT_FinancingBuy 'F'
-///现券还券成交(融资融券)
+/// 现券还券成交(融资融券)
 #define RH_TRADE_TRDT_RepayStock 'R'
 
-///现券还券成交(融资融券)
-#define RH_TRADE_TRDT_RepayStock_Auto 'R'//卖平今的现券还券
+/// 现券还券成交(融资融券)
+#define RH_TRADE_TRDT_RepayStock_Auto 'R' // 卖平今的现券还券
 
-#define RH_TRADE_TRDT_RepayStock_Manual 'S'//正常的现券还券指令
+#define RH_TRADE_TRDT_RepayStock_Manual 'S' // 正常的现券还券指令
 
 typedef char TRHTradeTypeType;
 
 /////////////////////////////////////////////////////////////////////////
-///TRHPriceSourceType是一个成交价来源类型
+/// TRHPriceSourceType是一个成交价来源类型
 /////////////////////////////////////////////////////////////////////////
-///前成交价
+/// 前成交价
 #define RH_TRADE_PSRC_LastPrice '0'
-///买委托价
+/// 买委托价
 #define RH_TRADE_PSRC_Buy '1'
-///卖委托价
+/// 卖委托价
 #define RH_TRADE_PSRC_Sell '2'
 
 typedef char TRHPriceSourceType;
 
 /////////////////////////////////////////////////////////////////////////
-///TRHTradeSourceType是一个成交来源类型
+/// TRHTradeSourceType是一个成交来源类型
 /////////////////////////////////////////////////////////////////////////
-///来自交易所普通回报
+/// 来自交易所普通回报
 #define TRH_TSRC_NORMAL '0'
-///来自查询
+/// 来自查询
 #define TRH_TSRC_QUERY '1'
 
 typedef char TRHTradeSourceType;
 
+/////////////////////////////////////////////////////////////////////////
+/// TRHAccountType是一个账户类型
+/////////////////////////////////////////////////////////////////////////
+/// 虚拟账户
+#define RH_ACCOUNTTYPE_VIRTUAL '0'
+/// 真实账户类型
+#define RH_ACCOUNTTYPE_REAL '1'
+/// 资金账户组(产品)
+#define RH_ACCOUNTTYPE_REALGROUP '2'
 
-/////////////////////////////////////////////////////////////////////////
-///TRHAccountType是一个账户类型
-/////////////////////////////////////////////////////////////////////////
-///虚拟账户
-#define  RH_ACCOUNTTYPE_VIRTUAL	'0' 
-///真实账户类型
-#define  RH_ACCOUNTTYPE_REAL		'1' 
-///资金账户组(产品)
-#define  RH_ACCOUNTTYPE_REALGROUP '2' 
- 
 typedef char TRHAccountType;
 
+/// TRHInstructionidType是一个策略指令编号类型
+/////////////////////////////////////////////////////////////////////////
+typedef char TRHInstructionidType[21];
 
 /////////////////////////////////////////////////////////////////////////
-///RHMonitorSubPushInfoType是一个回报类型定义,可通过'|'运算符来组合使用
+/// RHMonitorSubPushInfoType是一个回报类型定义,可通过'|'运算符来组合使用
 /////////////////////////////////////////////////////////////////////////
 enum
 {
-	///委托回报
+	/// 委托回报
 	RHMonitorSubPushInfoType_Order = 1,
-	///成交回报
+	/// 成交回报
 	RHMonitorSubPushInfoType_Trade = 2
 };
 
-typedef int	RHMonitorSubPushInfoType;
-
+typedef int RHMonitorSubPushInfoType;
 
 /////////////////////////////////////////////////////////////////////////
-///TRHContingentConditionType是一个触发条件类型
+/// TRHContingentConditionType是一个触发条件类型
 /////////////////////////////////////////////////////////////////////////
-///立即
+/// 立即
 #define RH_TRADE_CC_Immediately '1'
-///止损
+/// 止损
 #define RH_TRADE_CC_Touch '2'
-///止赢
+/// 止赢
 #define RH_TRADE_CC_TouchProfit '3'
-///预埋单
+/// 预埋单
 #define RH_TRADE_CC_ParkedOrder '4'
-///最新价大于条件价
+/// 最新价大于条件价
 #define RH_TRADE_CC_LastPriceGreaterThanStopPrice '5'
-///最新价大于等于条件价
+/// 最新价大于等于条件价
 #define RH_TRADE_CC_LastPriceGreaterEqualStopPrice '6'
-///最新价小于条件价
+/// 最新价小于条件价
 #define RH_TRADE_CC_LastPriceLesserThanStopPrice '7'
-///最新价小于等于条件价
+/// 最新价小于等于条件价
 #define RH_TRADE_CC_LastPriceLesserEqualStopPrice '8'
-///卖一价大于条件价
+/// 卖一价大于条件价
 #define RH_TRADE_CC_AskPriceGreaterThanStopPrice '9'
-///卖一价大于等于条件价
+/// 卖一价大于等于条件价
 #define RH_TRADE_CC_AskPriceGreaterEqualStopPrice 'A'
-///卖一价小于条件价
+/// 卖一价小于条件价
 #define RH_TRADE_CC_AskPriceLesserThanStopPrice 'B'
-///卖一价小于等于条件价
+/// 卖一价小于等于条件价
 #define RH_TRADE_CC_AskPriceLesserEqualStopPrice 'C'
-///买一价大于条件价
+/// 买一价大于条件价
 #define RH_TRADE_CC_BidPriceGreaterThanStopPrice 'D'
-///买一价大于等于条件价
+/// 买一价大于等于条件价
 #define RH_TRADE_CC_BidPriceGreaterEqualStopPrice 'E'
-///买一价小于条件价
+/// 买一价小于条件价
 #define RH_TRADE_CC_BidPriceLesserThanStopPrice 'F'
-///买一价小于等于条件价
+/// 买一价小于等于条件价
 #define RH_TRADE_CC_BidPriceLesserEqualStopPrice 'H'
-///开空指令转换为平昨仓优先
-#define RH_TRADE_CC_CloseYDFirst	'Z'
+/// 开空指令转换为平昨仓优先
+#define RH_TRADE_CC_CloseYDFirst 'Z'
 
 typedef char TRHContingentConditionType;
 
+/////////////////////////////////////////////////////////////////////////
+/// TRHInstLifePhaseType是一个合约生命周期状态类型
+/////////////////////////////////////////////////////////////////////////
+/// 未上市
+#define RH_TRADE_IP_NotStart '0'
+/// 上市
+#define RH_TRADE_IP_Started '1'
+/// 停牌
+#define RH_TRADE_IP_Pause '2'
+/// 到期
+#define RH_TRADE_IP_Expired '3'
+
+typedef char TRHInstLifePhaseType;
+
+/////////////////////////////////////////////////////////////////////////
+/// TRHPositionTypeType是一个持仓类型类型
+/////////////////////////////////////////////////////////////////////////
+/// 净持仓
+#define RH_TRADE_PT_Net '1'
+/// 综合持仓
+#define RH_TRADE_PT_Gross '2'
+
+typedef char TRHPositionTypeType;
+
+/////////////////////////////////////////////////////////////////////////
+/// TRHPositionDateTypeType是一个持仓日期类型类型
+/////////////////////////////////////////////////////////////////////////
+/// 使用历史持仓
+#define RH_TRADE_PDT_UseHistory '1'
+/// 不使用历史持仓
+#define RH_TRADE_PDT_NoUseHistory '2'
+
+typedef char TRHPositionDateTypeType;
+
+/////////////////////////////////////////////////////////////////////////
+/// TRHRatioType是一个比率类型
+/////////////////////////////////////////////////////////////////////////
+typedef double TRHRatioType;
+
+/////////////////////////////////////////////////////////////////////////
+/// TRHOptionsTypeType是一个期权类型类型
+/////////////////////////////////////////////////////////////////////////
+/// 看涨
+#define RH_TRADE_CP_CallOptions '1'
+/// 看跌
+#define RH_TRADE_CP_PutOptions '2'
+
+typedef char TRHOptionsTypeType;
+
+/////////////////////////////////////////////////////////////////////////
+/// TRHUnderlyingMultipleType是一个基础商品乘数类型
+/////////////////////////////////////////////////////////////////////////
+typedef double TRHUnderlyingMultipleType;
+
+/////////////////////////////////////////////////////////////////////////
+/// TRHCombinationTypeType是一个组合类型类型
+/////////////////////////////////////////////////////////////////////////
+/// 期货组合
+#define RH_TRADE_COMBT_Future '0'
+/// 垂直价差BUL
+#define RH_TRADE_COMBT_BUL '1'
+/// 垂直价差BER
+#define RH_TRADE_COMBT_BER '2'
+/// 跨式组合
+#define RH_TRADE_COMBT_STD '3'
+/// 宽跨式组合
+#define RH_TRADE_COMBT_STG '4'
+/// 备兑组合
+#define RH_TRADE_COMBT_PRT '5'
+/// 时间价差组合
+#define RH_TRADE_COMBT_CAS '6'
+/// 期权对锁组合
+#define RH_TRADE_COMBT_OPL '7'
+/// 买备兑组合
+#define RH_TRADE_COMBT_BFO '8'
+/// 买入期权垂直价差组合
+#define RH_TRADE_COMBT_BLS '9'
+/// 卖出期权垂直价差组合
+#define RH_TRADE_COMBT_BES 'a'
+
+typedef char TRHCombinationTypeType;
+
+/////////////////////////////////////////////////////////////////////////
+/// TRHProductClassType是一个产品类型类型
+/////////////////////////////////////////////////////////////////////////
+/// 期货
+#define RH_TRADE_PC_Futures '1'
+/// 期货期权
+#define RH_TRADE_PC_Options '2'
+/// 组合
+#define RH_TRADE_PC_Combination '3'
+/// 即期
+#define RH_TRADE_PC_Spot '4'
+/// 期转现
+#define RH_TRADE_PC_EFP '5'
+/// 现货期权
+#define RH_TRADE_PC_SpotOption '6'
+/// ETF期权
+#define RH_TRADE_PC_ETFOption 'e'
+/// 证券
+#define RH_TRADE_PC_Stock '8'
+/// 现货指数
+#define RH_TRADE_PC_StockIndex '9'
+/// 标的物的融资融券状态
+#define RH_TRADE_PC_AimStatus 'a'
+/// TAS合约
+#define RH_TRADE_PC_TAS '7'
+/// 金属指数
+#define RH_TRADE_PC_MI 'I'
+
+typedef char TRHProductClassType;
+
+/////////////////////////////////////////////////////////////////////////
+/// TRHInstrumentNameType是一个合约名称类型
+/////////////////////////////////////////////////////////////////////////
+typedef char TRHInstrumentNameType[21];
+
+/////////////////////////////////////////////////////////////////////////
+/// TRHProductClassType是一个产品类型类型
+/////////////////////////////////////////////////////////////////////////
+/// 期货
+#define RH_TRADE_PC_Futures '1'
+/// 期货期权
+#define RH_TRADE_PC_Options '2'
+/// 组合
+#define RH_TRADE_PC_Combination '3'
+/// 即期
+#define RH_TRADE_PC_Spot '4'
+/// 期转现
+#define RH_TRADE_PC_EFP '5'
+/// 现货期权
+#define RH_TRADE_PC_SpotOption '6'
+/// ETF期权
+#define RH_TRADE_PC_ETFOption 'e'
+/// 证券
+#define RH_TRADE_PC_Stock '8'
+/// 现货指数
+#define RH_TRADE_PC_StockIndex '9'
+/// 标的物的融资融券状态
+#define RH_TRADE_PC_AimStatus 'a'
+/// TAS合约
+#define RH_TRADE_PC_TAS '7'
+/// 金属指数
+#define RH_TRADE_PC_MI 'I'
+
+typedef char TRHProductClassType;
+
+/////////////////////////////////////////////////////////////////////////
+/// TRHYearType是一个年份类型
+/////////////////////////////////////////////////////////////////////////
+typedef int TRHYearType;
+
+/////////////////////////////////////////////////////////////////////////
+/// TRHMonthType是一个月份类型
+/////////////////////////////////////////////////////////////////////////
+typedef int TRHMonthType;
+
+/////////////////////////////////////////////////////////////////////////
+/// TRHVolumeMultipleType是一个合约数量乘数类型
+/////////////////////////////////////////////////////////////////////////
+typedef int TRHVolumeMultipleType;
 #endif
