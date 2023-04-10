@@ -1,13 +1,13 @@
 # cmake最低版本需求，不加入此行会受到警告信息
 CMAKE_MINIMUM_REQUIRED(VERSION 3.10)
 
+PROJECT(cRHMonitorApi) # 项目名称
+
 if(WIN32)
 	add_definitions(-DISLIB -DWIN32)
 endif()
 
 add_definitions(-DCRHMONITORAPI_EXPORTS)
-
-PROJECT(cRHMonitorApi VERSION 0.0.1) # 项目名称
 
 # C++11 support
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
@@ -19,7 +19,7 @@ SET(CMAKE_CXX_FLAGS_RELEASE "$ENV{CXXFLAGS} -O3 -Wall")
 
 set(
 	INCLUDE_DIRS
-	${PROJECT_SOURCE_DIR}/../includes
+	${PROJECT_SOURCE_DIR}/../include
 )
 
 set(

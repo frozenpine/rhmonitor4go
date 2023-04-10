@@ -22,6 +22,7 @@ go.work
 
 **/log_files
 **/*.eddx
+**/build
 
 examples/asyncrhmon/asyncrhmon*
 examples/rhmon-client/rhmon-client*
