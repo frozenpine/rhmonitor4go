@@ -29,3 +29,6 @@ examples/riskclient/riskclient*
 examples/rhmon-server/rhmon-server*
 examples/riskhub/riskhub*
 examples/rhmonitor/rhmonitor*
+**/*.crt
+**/*.cert
+**/*.key

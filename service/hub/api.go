@@ -96,11 +96,6 @@ func (api *grpcRiskApi) OnFrontDisconnected(reason rohon.Reason) {
 	))
 }
 
-func (api *grpcRiskApi) OnRspUserLogin(login *rohon.RspUserLogin, info *rohon.RspInfo, reqID int64) {
-	api.AsyncRHMonitorApi.OnRspUserLogin(login, info, reqID)
-	api.state.loggedIn.Store(true)
-}
-
 func reqFinalFn[T rhapi.RHRiskData](result *service.Result) rhapi.CallbackFn[T] {
 	return func(req rhapi.Result[T]) error {
 		result.ReqId = int32(req.GetRequestID())

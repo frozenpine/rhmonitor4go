@@ -59,7 +59,7 @@ func (c *client) String() string {
 	if c.login.Load() {
 		result.WriteString(": Logged in")
 	} else {
-		result.WriteString(": Not login")
+		result.WriteString(": No login")
 	}
 
 	return result.String()

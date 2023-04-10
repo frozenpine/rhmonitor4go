@@ -210,6 +210,7 @@ func (hub *RiskHub) ReqUserLogin(ctx context.Context, req *service.Request) (res
 			}
 
 			c.login.Store(true)
+			c.api.state.loggedIn.Store(true)
 			c.api.state.user = user
 			c.api.state.rspLogin = *login
 

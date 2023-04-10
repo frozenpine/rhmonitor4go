@@ -9,6 +9,14 @@ Group=risk
 WorkingDirectory=/home/risk/riskhub
 Environment=LD_LIBRARY_PATH=.
 ExecStart=/home/risk/riskhub/riskhub
+
+# systemctl --version newer than 240
+# StandardOutput=append:/var/log/riskhub/riskhub.log
+# StandardError=append:/var/log/riskhub/riskhub.err
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=riskhub
+
 Restart=on-failure
 
 [Install]
