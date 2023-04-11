@@ -86,7 +86,7 @@ type baseResult[T RHRiskData] struct {
 
 	data chan *T
 
-	finish sync.WaitGroup
+	rspFin sync.WaitGroup
 
 	successFn CallbackFn[T]
 	failFn    CallbackFn[T]
@@ -134,11 +134,12 @@ func (r *baseResult[T]) Finally(fn CallbackFn[T]) Promise[T] {
 	return r.self
 }
 
-type rsp struct {
+type rsp[T RHRiskData] struct {
 	info       *rhmonitor4go.RspInfo
 	status     bool
-	notifyFlag chan struct{}
-	notifyOnce sync.Once
+	dataFlag   chan struct{}
+	notifyData sync.Once
+	data       chan *T
 }
 
 type BatchResult[T RHRiskData] struct {
@@ -147,17 +148,23 @@ type BatchResult[T RHRiskData] struct {
 	requestIDList       []int64
 	execCodeList        []int
 	promiseErrChainList [][]PromiseError
-	rspCache            map[int64]*rsp
+	rspCache            map[int64]*rsp[T]
+
+	errCollector  chan int
+	dataCollector chan *T
+	collectorDone chan struct{}
 }
 
-func (r *BatchResult[T]) waitRsp(reqID int64) {
+func (r *BatchResult[T]) waitRsp(reqID int64) error {
 	cache, exist := r.rspCache[reqID]
 
 	if !exist {
-		return
+		return ErrRspChanMissing
 	}
 
-	<-cache.notifyFlag
+	<-cache.dataFlag
+
+	return nil
 }
 
 func (r *BatchResult[T]) IsBatch() bool { return true }
@@ -195,10 +202,13 @@ func (r *BatchResult[T]) AppendRequest(reqID int64, execCode int) {
 	r.promiseErrChainList = append(r.promiseErrChainList, []PromiseError{})
 
 	if execCode == 0 {
-		r.rspCache[reqID] = &rsp{
-			notifyFlag: make(chan struct{}),
+		r.rspCache[reqID] = &rsp[T]{
+			dataFlag: make(chan struct{}),
+			data:     make(chan *T, 1),
 		}
 	}
+
+	logger.Printf("Append request: %d, %d", reqID, execCode)
 }
 
 func (r *BatchResult[T]) GetExecCode() int {
@@ -246,30 +256,39 @@ func (r *BatchResult[T]) AppendResult(reqID int64, v *T, isLast bool) {
 		return
 	}
 
-	cache.notifyOnce.Do(func() { close(cache.notifyFlag) })
-
-	r.data <- v
+	logger.Printf("Append result[%d] %v: %+v", reqID, isLast, v)
 
 	cache.status = isLast
 
-	all := true
-	for _, cache := range r.rspCache {
-		all = all && cache.status
-	}
+	cache.data <- v
 
-	if all {
-		close(r.data)
+	cache.notifyData.Do(func() { close(cache.dataFlag) })
+
+	if isLast {
+		close(cache.data)
 	}
 }
 
 func (r *BatchResult[T]) Await(ctx context.Context, timeout time.Duration) error {
-	r.finish.Add(len(r.requestIDList))
+	logger.Printf("Await response for: %v", r.requestIDList)
+
+	r.rspFin.Add(len(r.requestIDList))
+
+	go func() {
+		defer func() { close(r.collectorDone) }()
+
+		// TODO: 大改造THEN, CATCH, FINAL
+	}()
 
 	for idx, reqID := range r.requestIDList {
 		go func(idx int, reqID int64) {
-			r.waitRsp(reqID)
+			if err := r.waitRsp(reqID); err != nil {
+				logger.Printf("Wait response[%d] faield: %+v", reqID, err)
+				r.rspFin.Done()
+				return
+			}
 
-			defer r.finish.Done()
+			defer r.rspFin.Done()
 
 			execCode := r.execCodeList[idx]
 			cache := r.rspCache[reqID]
@@ -283,11 +302,13 @@ func (r *BatchResult[T]) Await(ctx context.Context, timeout time.Duration) error
 					},
 				)
 
-				goto CATCH
+				return
 			}
 
 			if cache.info == nil || cache.info.ErrorID == 0 {
-				goto THEN
+				for v := range cache.data {
+					r.dataCollector <- v
+				}
 			} else {
 				r.promiseErrChainList[idx] = append(
 					r.promiseErrChainList[idx],
@@ -297,62 +318,69 @@ func (r *BatchResult[T]) Await(ctx context.Context, timeout time.Duration) error
 					},
 				)
 
-				goto CATCH
+				// return
 			}
 
-		THEN:
-			if r.successFn != nil {
-				if err := r.successFn(r); err != nil {
-					r.promiseErrChainList[idx] = append(
-						r.promiseErrChainList[idx],
-						PromiseError{
-							stage: PromiseThen,
-							err:   err,
-						},
-					)
+			// THEN:
+			// 	if r.successFn != nil {
+			// 		if err := r.successFn(r); err != nil {
+			// 			r.promiseErrChainList[idx] = append(
+			// 				r.promiseErrChainList[idx],
+			// 				PromiseError{
+			// 					stage: PromiseThen,
+			// 					err:   err,
+			// 				},
+			// 			)
 
-					goto CATCH
-				}
-			}
+			// 			goto CATCH
+			// 		}
+			// 	}
 
-			goto FINAL
-		CATCH:
-			if r.failFn != nil {
-				if err := r.failFn(r); err != nil {
-					r.promiseErrChainList[idx] = append(
-						r.promiseErrChainList[idx],
-						PromiseError{
-							stage: PromiseCatch,
-							err:   err,
-						},
-					)
-				}
-			}
+			// 	goto FINAL
+			// CATCH:
+			// 	if r.failFn != nil {
+			// 		if err := r.failFn(r); err != nil {
+			// 			r.promiseErrChainList[idx] = append(
+			// 				r.promiseErrChainList[idx],
+			// 				PromiseError{
+			// 					stage: PromiseCatch,
+			// 					err:   err,
+			// 				},
+			// 			)
+			// 		}
+			// 	}
 
-			goto FINAL
-		FINAL:
-			if r.finalFn != nil {
-				if err := r.finalFn(r); err != nil {
-					r.promiseErrChainList[idx] = append(
-						r.promiseErrChainList[idx],
-						PromiseError{
-							stage: PromiseFinal,
-							err:   err,
-						},
-					)
-				}
-			}
+			// 	goto FINAL
+			// FINAL:
+			// 	if r.finalFn != nil {
+			// 		if err := r.finalFn(r); err != nil {
+			// 			r.promiseErrChainList[idx] = append(
+			// 				r.promiseErrChainList[idx],
+			// 				PromiseError{
+			// 					stage: PromiseFinal,
+			// 					err:   err,
+			// 				},
+			// 			)
+			// 		}
+			// 	}
 		}(idx, reqID)
 	}
 
-	r.finish.Wait()
+	r.rspFin.Wait()
+	close(r.data)
+
+	<-r.collectorDone
+	close(r.data)
 
 	return r.GetError()
 }
 
 func NewBatchResult[T RHRiskData]() *BatchResult[T] {
 	result := BatchResult[T]{
-		rspCache: make(map[int64]*rsp),
+		rspCache:      make(map[int64]*rsp[T]),
+		errCollector:  make(chan int, 1),
+		dataCollector: make(chan *T, 1),
+		collectorDone: make(chan struct{}),
 	}
 	result.init(&result)
 
@@ -424,7 +452,7 @@ func (r *SingleResult[T]) SetRspInfo(_ int64, rsp *rhmonitor4go.RspInfo) {
 func (r *SingleResult[T]) awaitLoop() {
 	r.waitRsp()
 
-	defer r.finish.Done()
+	defer r.rspFin.Done()
 
 	if r.execCode != 0 {
 		r.promiseErrChain = append(
@@ -498,11 +526,11 @@ FINAL:
 }
 
 func (r *SingleResult[T]) Await(ctx context.Context, timeout time.Duration) error {
-	r.finish.Add(1)
+	r.rspFin.Add(1)
 
 	go r.awaitLoop()
 
-	r.finish.Wait()
+	r.rspFin.Wait()
 
 	return r.GetError()
 }
@@ -529,12 +557,12 @@ type FlowResult[T RHRiskData] struct {
 }
 
 func (r *FlowResult[T]) Await(ctx context.Context, timeout time.Duration) error {
-	r.finish.Add(1)
+	r.rspFin.Add(1)
 
 	go r.awaitLoop()
 
 	if r.GetExecCode() != 0 {
-		r.finish.Wait()
+		r.rspFin.Wait()
 	}
 
 	return r.GetError()

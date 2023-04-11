@@ -130,9 +130,9 @@ func (api *AsyncRHMonitorApi) AsyncReqQryInvestorMoney(investor *rhmonitor4go.In
 }
 
 func (api *AsyncRHMonitorApi) AsyncReqQryAllInvestorMoney() Result[rhmonitor4go.Account] {
-	results := NewBatchResult[rhmonitor4go.Account]()
-
 	api.requests.WaitInvestorReady()
+
+	results := NewBatchResult[rhmonitor4go.Account]()
 
 	api.investors.ForEach(func(s string, i *rhmonitor4go.Investor) bool {
 		reqID, rtn := api.ExecReqQryInvestorMoney(i)

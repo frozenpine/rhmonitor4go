@@ -27,7 +27,8 @@ var (
 
 var logger = log.New(
 	log.Default().Writer(),
-	"[rhmonitor4go.service.hub] ", log.Default().Flags(),
+	"[rhmonitor4go.service.hub] ",
+	log.Flags()|log.Lmicroseconds,
 )
 
 type RiskHub struct {

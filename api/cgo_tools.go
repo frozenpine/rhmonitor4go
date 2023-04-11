@@ -19,7 +19,7 @@ import (
 
 var logger = log.New(
 	log.Default().Writer(),
-	"[rhmonitor4go.api] ", log.Default().Flags(),
+	"[rhmonitor4go.api] ", log.Flags()|log.Lmicroseconds,
 )
 
 func GbkToUtf8(s []byte) ([]byte, error) {
