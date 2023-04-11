@@ -55,9 +55,7 @@ func (api *AsyncRHMonitorApi) OnRspUserLogin(
 	if async, exist := api.promiseCache.LoadAndDelete(reqID); exist {
 		result := async.(Result[rhmonitor4go.RspUserLogin])
 
-		result.SetRspInfo(reqID, info)
-
-		result.AppendResult(reqID, login, true)
+		result.AppendResult(reqID, login, info, true)
 	} else {
 		promiseMissingHandler(reqID, info, login)
 	}
@@ -80,9 +78,7 @@ func (api *AsyncRHMonitorApi) OnRspUserLogout(
 	if async, exist := api.promiseCache.LoadAndDelete(reqID); exist {
 		result := async.(Result[rhmonitor4go.RspUserLogout])
 
-		result.SetRspInfo(reqID, info)
-
-		result.AppendResult(reqID, logout, true)
+		result.AppendResult(reqID, logout, info, true)
 	} else {
 		promiseMissingHandler(reqID, info, logout)
 	}
@@ -108,9 +104,7 @@ func (api *AsyncRHMonitorApi) OnRspQryMonitorAccounts(
 	if promise, exist := api.promiseCache.Load(reqID); exist {
 		result := promise.(Result[rhmonitor4go.Investor])
 
-		result.SetRspInfo(reqID, info)
-
-		result.AppendResult(reqID, investor, isLast)
+		result.AppendResult(reqID, investor, info, isLast)
 
 		if isLast {
 			api.promiseCache.Delete(reqID)
@@ -155,9 +149,7 @@ func (api *AsyncRHMonitorApi) OnRspQryInvestorMoney(acct *rhmonitor4go.Account, 
 	if async, exist := api.promiseCache.Load(reqID); exist {
 		result := async.(Result[rhmonitor4go.Account])
 
-		result.SetRspInfo(reqID, info)
-
-		result.AppendResult(reqID, acct, isLast)
+		result.AppendResult(reqID, acct, info, isLast)
 
 		if isLast {
 			api.promiseCache.Delete(reqID)
@@ -180,9 +172,7 @@ func (api *AsyncRHMonitorApi) OnRspQryInvestorPosition(pos *rhmonitor4go.Positio
 	if async, exist := api.promiseCache.Load(reqID); exist {
 		result := async.(Result[rhmonitor4go.Position])
 
-		result.SetRspInfo(reqID, info)
-
-		result.AppendResult(reqID, pos, isLast)
+		result.AppendResult(reqID, pos, info, isLast)
 
 		if isLast {
 			api.promiseCache.Delete(reqID)
@@ -207,9 +197,7 @@ func (api *AsyncRHMonitorApi) OnRspOffsetOrder(offset *rhmonitor4go.OffsetOrder,
 	if async, exist := api.promiseCache.Load(reqID); exist {
 		result := async.(Result[rhmonitor4go.OffsetOrder])
 
-		result.SetRspInfo(reqID, info)
-
-		result.AppendResult(reqID, offset, isLast)
+		result.AppendResult(reqID, offset, info, isLast)
 
 		if isLast {
 			api.promiseCache.Delete(reqID)
@@ -279,7 +267,7 @@ func (api *AsyncRHMonitorApi) AsyncReqSubAllInvestorOrder() Result[rhmonitor4go.
 
 func (api *AsyncRHMonitorApi) OnRtnOrder(order *rhmonitor4go.Order) {
 	if flow := api.GetOrderFlow(); flow != nil {
-		flow.AppendResult(InfinitResultReq, order, false)
+		flow.AppendResult(InfinitResultReq, order, nil, false)
 	}
 }
 
@@ -313,7 +301,7 @@ func (api *AsyncRHMonitorApi) OnRtnTrade(trade *rhmonitor4go.Trade) {
 	// api.RHMonitorApi.OnRtnTrade(trade)
 
 	if flow := api.GetTradeFlow(); flow != nil {
-		flow.AppendResult(InfinitResultReq, trade, false)
+		flow.AppendResult(InfinitResultReq, trade, nil, false)
 	}
 }
 
@@ -329,7 +317,7 @@ func (api *AsyncRHMonitorApi) OnRtnInvestorMoney(account *rhmonitor4go.Account) 
 	// api.RHMonitorApi.OnRtnInvestorMoney(account)
 
 	if flow := api.GetAccountFlow(); flow != nil {
-		flow.AppendResult(InfinitResultReq, account, false)
+		flow.AppendResult(InfinitResultReq, account, nil, false)
 	}
 }
 
@@ -357,6 +345,6 @@ func (api *AsyncRHMonitorApi) OnRtnInvestorPosition(position *rhmonitor4go.Posit
 	// api.RHMonitorApi.OnRtnInvestorPosition(position)
 
 	if flow := api.GetPositionFlow(); flow != nil {
-		flow.AppendResult(InfinitResultReq, position, false)
+		flow.AppendResult(InfinitResultReq, position, nil, false)
 	}
 }
