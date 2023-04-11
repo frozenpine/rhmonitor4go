@@ -25,6 +25,11 @@ var (
 	ErrRequestFailed   = errors.New("request execution failed")
 )
 
+var logger = log.New(
+	log.Default().Writer(),
+	"[rhmonitor4go.service.hub] ", log.Default().Flags(),
+)
+
 type RiskHub struct {
 	service.UnimplementedRohonMonitorServer
 
@@ -124,7 +129,7 @@ func (hub *RiskHub) Init(ctx context.Context, req *service.Request) (result *ser
 				front.BrokerId, front.ServerAddr,
 				int(front.ServerPort), api,
 			); err != nil {
-				log.Printf("Create AsyncRHMonitorApi failed: %+v", err)
+				logger.Printf("Create AsyncRHMonitorApi failed: %+v", err)
 
 				return
 			}
@@ -132,7 +137,7 @@ func (hub *RiskHub) Init(ctx context.Context, req *service.Request) (result *ser
 			hub.apiCache.Store(apiIdentity, api)
 			err = nil
 
-			log.Printf("New risk api created: %+v", front)
+			logger.Printf("New risk api created: %+v", front)
 		} else {
 			return
 		}
@@ -145,7 +150,7 @@ func (hub *RiskHub) Init(ctx context.Context, req *service.Request) (result *ser
 	result.ReqId = -1
 	result.Response = &service.Result_ApiIdentity{ApiIdentity: clientIdt}
 
-	log.Printf("New client initiated: %s, %+v", clientIdt, c)
+	logger.Printf("New client initiated: %s, %+v", clientIdt, c)
 
 	return
 }
@@ -157,7 +162,7 @@ func (hub *RiskHub) Release(ctx context.Context, req *service.Request) (empty *e
 
 	empty = &emptypb.Empty{}
 
-	log.Printf("Releasing risk api: %s", req.GetApiIdentity())
+	logger.Printf("Releasing risk api: %s", req.GetApiIdentity())
 
 	return
 }
@@ -188,7 +193,7 @@ func (hub *RiskHub) ReqUserLogin(ctx context.Context, req *service.Request) (res
 				UserLogin: service.ConvertRspLogin(&c.api.state.rspLogin),
 			}
 
-			log.Printf("Client login with api cache: %s", c)
+			logger.Printf("Client login with api cache: %s", c)
 		} else {
 			err = errors.New("[grpc] Invalid username or password")
 		}

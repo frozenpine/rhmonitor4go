@@ -69,6 +69,7 @@ const (
 )
 
 func init() {
+	log.SetPrefix("[main] ")
 	log.SetFlags(log.Flags() | log.Lmicroseconds)
 
 	flag.StringVar(&rpcAddr, "addr", rpcAddr, "gRPC remote addr")

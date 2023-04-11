@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
@@ -240,7 +239,7 @@ func (r *BatchResult[T]) AppendResult(reqID int64, v *T, isLast bool) {
 	cache, exist := r.rspCache[reqID]
 
 	if !exist {
-		log.Printf(
+		logger.Printf(
 			"Appended RequestID[%d] not exist in BatchResult", reqID,
 		)
 
@@ -401,7 +400,7 @@ func (r *SingleResult[T]) GetError() (err error) {
 
 func (r *SingleResult[T]) AppendResult(reqID int64, v *T, isLast bool) {
 	if reqID != r.requestID {
-		log.Printf(
+		logger.Printf(
 			"Appended RequestID[%d] miss match with Result[%d]",
 			reqID, r.requestID,
 		)

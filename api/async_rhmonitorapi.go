@@ -1,7 +1,6 @@
 package api
 
 import (
-	"log"
 	"sync"
 
 	"github.com/frozenpine/rhmonitor4go"
@@ -16,6 +15,10 @@ type RHRiskData interface {
 
 type CallbackFn[T RHRiskData] func(Result[T]) error
 
+func promiseMissingHandler(reqID int64, info *rhmonitor4go.RspInfo, data interface{}) {
+	logger.Printf("No promise found for req[%d]: %s\n\t%+v", reqID, info, data)
+}
+
 type AsyncRHMonitorApi struct {
 	RHMonitorApi
 
@@ -27,7 +30,7 @@ func NewAsyncRHMonitorApi(brokerID, addr string, port int) *AsyncRHMonitorApi {
 	api := AsyncRHMonitorApi{}
 
 	if err := api.Init(brokerID, addr, port, &api); err != nil {
-		log.Printf("Create AsyncRHMonitorApi failed: %+v", err)
+		logger.Printf("Create AsyncRHMonitorApi failed: %+v", err)
 		return nil
 	}
 
@@ -55,6 +58,8 @@ func (api *AsyncRHMonitorApi) OnRspUserLogin(
 		result.SetRspInfo(reqID, info)
 
 		result.AppendResult(reqID, login, true)
+	} else {
+		promiseMissingHandler(reqID, info, login)
 	}
 }
 
@@ -78,6 +83,8 @@ func (api *AsyncRHMonitorApi) OnRspUserLogout(
 		result.SetRspInfo(reqID, info)
 
 		result.AppendResult(reqID, logout, true)
+	} else {
+		promiseMissingHandler(reqID, info, logout)
 	}
 }
 
@@ -108,6 +115,8 @@ func (api *AsyncRHMonitorApi) OnRspQryMonitorAccounts(
 		if isLast {
 			api.promiseCache.Delete(reqID)
 		}
+	} else {
+		promiseMissingHandler(reqID, info, investor)
 	}
 }
 
@@ -132,7 +141,7 @@ func (api *AsyncRHMonitorApi) AsyncReqQryAllInvestorMoney() Result[rhmonitor4go.
 		results.AppendRequest(reqID, rtn)
 
 		if rtn != 0 {
-			log.Printf("Query money for user[%s] failed: %d", i.InvestorID, rtn)
+			logger.Printf("Query money for user[%s] failed: %d", i.InvestorID, rtn)
 			return false
 		}
 
@@ -153,6 +162,8 @@ func (api *AsyncRHMonitorApi) OnRspQryInvestorMoney(acct *rhmonitor4go.Account, 
 		if isLast {
 			api.promiseCache.Delete(reqID)
 		}
+	} else {
+		promiseMissingHandler(reqID, info, acct)
 	}
 }
 
@@ -176,6 +187,8 @@ func (api *AsyncRHMonitorApi) OnRspQryInvestorPosition(pos *rhmonitor4go.Positio
 		if isLast {
 			api.promiseCache.Delete(reqID)
 		}
+	} else {
+		promiseMissingHandler(reqID, info, pos)
 	}
 }
 
@@ -201,6 +214,8 @@ func (api *AsyncRHMonitorApi) OnRspOffsetOrder(offset *rhmonitor4go.OffsetOrder,
 		if isLast {
 			api.promiseCache.Delete(reqID)
 		}
+	} else {
+		promiseMissingHandler(reqID, info, offset)
 	}
 }
 
