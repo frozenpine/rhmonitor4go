@@ -266,105 +266,96 @@ func (r *BatchResult[T]) AppendResult(reqID int64, v *T, info *rhmonitor4go.RspI
 	cache.setLast(isLast)
 }
 
+func (r *BatchResult[T]) handleCatch() error {
+	if r.failFn != nil {
+		return r.failFn(r)
+	}
+
+	return nil
+}
+
 func (r *BatchResult[T]) Await(ctx context.Context, timeout time.Duration) error {
 	logger.Printf("Await response for: %v", r.requestIDList)
 
-	r.rspFin.Add(len(r.rspCache))
+	r.rspFin.Add(len(r.requestIDList))
 
-	for reqID, cache := range r.rspCache {
-		go func(i int64, c *rspStatus) {
-			c.waitLast()
-			r.rspFin.Done()
-		}(reqID, cache)
+	for i, j := range r.requestIDList {
+		go func(idx int, reqID int64) {
+			defer r.rspFin.Done()
+
+			cache, exist := r.rspCache[reqID]
+			if !exist {
+				logger.Printf("No cache found for request: %d", reqID)
+				return
+			}
+
+			cache.waitData()
+			info := cache.info.Load()
+
+			if exec := r.execCodeList[idx]; exec != 0 {
+				r.promiseErrChainList[idx] = append(
+					r.promiseErrChainList[idx],
+					PromiseError{
+						stage: PromiseInfight,
+						err:   &ExecError{exec_code: exec},
+					},
+				)
+				goto CATCH
+			}
+
+			if info.ErrorID == 0 {
+				goto THEN
+			}
+
+			r.promiseErrChainList[idx] = append(
+				r.promiseErrChainList[idx],
+				PromiseError{
+					stage: PromiseAwait,
+					err:   info,
+				},
+			)
+
+			goto CATCH
+
+		THEN:
+			if r.successFn != nil {
+				if err := r.successFn(r); err != nil {
+					r.promiseErrChainList[idx] = append(
+						r.promiseErrChainList[idx],
+						PromiseError{stage: PromiseThen, err: err},
+					)
+
+					goto CATCH
+				}
+			}
+			cache.waitLast()
+			goto FINAL
+		CATCH:
+			if r.failFn != nil {
+				if err := r.failFn(r); err != nil {
+					r.promiseErrChainList[idx] = append(
+						r.promiseErrChainList[idx],
+						PromiseError{
+							stage: PromiseCatch,
+							err:   err,
+						},
+					)
+				}
+			}
+		FINAL:
+			if r.finalFn != nil {
+				if err := r.finalFn(r); err != nil {
+					r.promiseErrChainList[idx] = append(
+						r.promiseErrChainList[idx],
+						PromiseError{
+							stage: PromiseFinal,
+							err:   err,
+						},
+					)
+				}
+			}
+		}(i, j)
 	}
-
-	// TODO: THEN CATCH FINAL
-
-	// for idx, reqID := range r.requestIDList {
-	// 	go func(idx int, reqID int64) {
-	// 		// if err := r.waitRsp(reqID); err != nil {
-	// 		// 	logger.Printf("Wait response[%d] faield: %+v", reqID, err)
-	// 		// 	r.rspFin.Done()
-	// 		// 	return
-	// 		// }
-
-	// 		defer r.rspFin.Done()
-
-	// 		execCode := r.execCodeList[idx]
-	// 		// cache := r.rspCache[reqID]
-
-	// 		if execCode != 0 {
-	// 			r.promiseErrChainList[idx] = append(
-	// 				r.promiseErrChainList[idx],
-	// 				PromiseError{
-	// 					stage: PromiseInfight,
-	// 					err:   &ExecError{exec_code: execCode},
-	// 				},
-	// 			)
-
-	// 			return
-	// 		}
-
-	// 		// if cache.info == nil || cache.info.ErrorID == 0 {
-	// 		// 	for v := range cache.data {
-	// 		// 		r.dataCollector <- v
-	// 		// 	}
-	// 		// } else {
-	// 		// 	r.promiseErrChainList[idx] = append(
-	// 		// 		r.promiseErrChainList[idx],
-	// 		// 		PromiseError{
-	// 		// 			stage: PromiseAwait,
-	// 		// 			err:   cache.info,
-	// 		// 		},
-	// 		// 	)
-
-	// 		// 	// return
-	// 		// }
-
-	// 		// THEN:
-	// 		// 	if r.successFn != nil {
-	// 		// 		if err := r.successFn(r); err != nil {
-	// 		// 			r.promiseErrChainList[idx] = append(
-	// 		// 				r.promiseErrChainList[idx],
-	// 		// 				PromiseError{
-	// 		// 					stage: PromiseThen,
-	// 		// 					err:   err,
-	// 		// 				},
-	// 		// 			)
-
-	// 		// 			goto CATCH
-	// 		// 		}
-	// 		// 	}
-
-	// 		// 	goto FINAL
-	// 		// CATCH:
-	// 		// 	if r.failFn != nil {
-	// 		// 		if err := r.failFn(r); err != nil {
-	// 		// 			r.promiseErrChainList[idx] = append(
-	// 		// 				r.promiseErrChainList[idx],
-	// 		// 				PromiseError{
-	// 		// 					stage: PromiseCatch,
-	// 		// 					err:   err,
-	// 		// 				},
-	// 		// 			)
-	// 		// 		}
-	// 		// 	}
-
-	// 		// 	goto FINAL
-	// 		// FINAL:
-	// 		// 	if r.finalFn != nil {
-	// 		// 		if err := r.finalFn(r); err != nil {
-	// 		// 			r.promiseErrChainList[idx] = append(
-	// 		// 				r.promiseErrChainList[idx],
-	// 		// 				PromiseError{
-	// 		// 					stage: PromiseFinal,
-	// 		// 					err:   err,
-	// 		// 				},
-	// 		// 			)
-	// 		// 		}
-	// 		// 	}
-	// 	}(idx, reqID)
-	// }
 
 	r.rspFin.Wait()
 	close(r.data)
