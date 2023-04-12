@@ -266,14 +266,6 @@ func (r *BatchResult[T]) AppendResult(reqID int64, v *T, info *rhmonitor4go.RspI
 	cache.setLast(isLast)
 }
 
-func (r *BatchResult[T]) handleCatch() error {
-	if r.failFn != nil {
-		return r.failFn(r)
-	}
-
-	return nil
-}
-
 func (r *BatchResult[T]) Await(ctx context.Context, timeout time.Duration) error {
 	logger.Printf("Await response for: %v", r.requestIDList)
 
@@ -283,13 +275,7 @@ func (r *BatchResult[T]) Await(ctx context.Context, timeout time.Duration) error
 		go func(idx int, reqID int64) {
 			defer r.rspFin.Done()
 
-			cache, exist := r.rspCache[reqID]
-			if !exist {
-				logger.Printf("No cache found for request: %d", reqID)
-				return
-			}
-
-			cache.waitData()
+			cache := r.rspCache[reqID]
 			info := cache.info.Load()
 
 			if exec := r.execCodeList[idx]; exec != 0 {
@@ -302,6 +288,8 @@ func (r *BatchResult[T]) Await(ctx context.Context, timeout time.Duration) error
 				)
 				goto CATCH
 			}
+
+			cache.waitData()
 
 			if info.ErrorID == 0 {
 				goto THEN
