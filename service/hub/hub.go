@@ -357,6 +357,8 @@ func (hub *RiskHub) ReqQryInvestorMoney(ctx context.Context, req *service.Reques
 		accounts := &service.AccountList{}
 
 		for acct := range r.GetData() {
+			c.api.state.accountCache.LoadOrStore(acct.AccountID, acct)
+
 			accounts.Data = append(accounts.Data, service.ConvertAccount(acct))
 		}
 
@@ -529,6 +531,17 @@ func (hub *RiskHub) SubInvestorMoney(req *service.Request, stream service.RohonM
 
 		go func() {
 			for acct := range result.GetData() {
+				last, exist := c.api.state.accountCache.LoadOrStore(acct.AccountID, acct)
+
+				if exist && service.RohonCompareAccount(last.(*rohon.Account), acct) {
+					// 动态权益无变化, 不推送消息, 减少数据量
+					log.Printf(
+						"Account[%s] dynamic balance unchanged: %+v, %+v",
+						acct.AccountID, last, acct,
+					)
+					continue
+				}
+
 				p.Publish(acct, -1)
 			}
 		}()

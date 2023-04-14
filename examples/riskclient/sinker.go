@@ -83,7 +83,10 @@ func (acct *SinkAccount) FromAccount(value *service.Account) {
 	acct.Fee = value.Commission + value.FrozenCommission
 	acct.Margin = value.CurrentMargin + value.FrozenMargin
 	acct.Available = value.Available
-	acct.Balance = acct.PreBalance + acct.Deposit - acct.Withdraw + acct.Profit - value.Commission
+	acct.Balance = service.RohonCaculateDynamicBalance(
+		value.PreBalance, value.Deposit, value.Withdraw,
+		value.CloseProfit, value.PositionProfit, value.Commission,
+	)
 }
 
 type BarMode uint8

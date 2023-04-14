@@ -3,6 +3,7 @@ package hub
 import (
 	"context"
 	"fmt"
+	"sync"
 	"sync/atomic"
 
 	"github.com/frozenpine/msgqueue/channel"
@@ -23,6 +24,8 @@ type apiState struct {
 	tradeFlow    atomic.Pointer[channel.MemoChannel[*rohon.Trade]]
 	positionFlow atomic.Pointer[channel.MemoChannel[*rohon.Position]]
 	accountFlow  atomic.Pointer[channel.MemoChannel[*rohon.Account]]
+
+	accountCache sync.Map
 }
 
 func frontToIdentity(f *service.RiskServer) string {
