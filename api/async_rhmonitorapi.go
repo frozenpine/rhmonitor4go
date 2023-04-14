@@ -1,6 +1,7 @@
 package api
 
 import (
+	"log"
 	"sync"
 
 	"github.com/frozenpine/rhmonitor4go"
@@ -16,7 +17,7 @@ type RHRiskData interface {
 type CallbackFn[T RHRiskData] func(Result[T]) error
 
 func promiseMissingHandler(reqID int64, info *rhmonitor4go.RspInfo, data interface{}) {
-	logger.Printf("No promise found for req[%d]: %s\n\t%+v", reqID, info, data)
+	log.Printf("No promise found for req[%d]: %s\n\t%+v", reqID, info, data)
 }
 
 type AsyncRHMonitorApi struct {
@@ -30,7 +31,7 @@ func NewAsyncRHMonitorApi(brokerID, addr string, port int) *AsyncRHMonitorApi {
 	api := AsyncRHMonitorApi{}
 
 	if err := api.Init(brokerID, addr, port, &api); err != nil {
-		logger.Printf("Create AsyncRHMonitorApi failed: %+v", err)
+		log.Printf("Create AsyncRHMonitorApi failed: %+v", err)
 		return nil
 	}
 
@@ -135,7 +136,7 @@ func (api *AsyncRHMonitorApi) AsyncReqQryAllInvestorMoney() Result[rhmonitor4go.
 		results.AppendRequest(reqID, rtn)
 
 		if rtn != 0 {
-			logger.Printf("Query money for user[%s] failed: %d", i.InvestorID, rtn)
+			log.Printf("Query money for user[%s] failed: %d", i.InvestorID, rtn)
 			return false
 		}
 

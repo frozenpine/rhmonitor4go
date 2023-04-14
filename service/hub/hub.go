@@ -25,12 +25,6 @@ var (
 	ErrRequestFailed   = errors.New("request execution failed")
 )
 
-var logger = log.New(
-	log.Default().Writer(),
-	"[rhmonitor4go.service.hub] ",
-	log.Flags()|log.Lmicroseconds,
-)
-
 type RiskHub struct {
 	service.UnimplementedRohonMonitorServer
 
@@ -130,7 +124,7 @@ func (hub *RiskHub) Init(ctx context.Context, req *service.Request) (result *ser
 				front.BrokerId, front.ServerAddr,
 				int(front.ServerPort), api,
 			); err != nil {
-				logger.Printf("Create AsyncRHMonitorApi failed: %+v", err)
+				log.Printf("Create AsyncRHMonitorApi failed: %+v", err)
 
 				return
 			}
@@ -138,7 +132,7 @@ func (hub *RiskHub) Init(ctx context.Context, req *service.Request) (result *ser
 			hub.apiCache.Store(apiIdentity, api)
 			err = nil
 
-			logger.Printf("New risk api created: %+v", front)
+			log.Printf("New risk api created: %+v", front)
 		} else {
 			return
 		}
@@ -151,7 +145,7 @@ func (hub *RiskHub) Init(ctx context.Context, req *service.Request) (result *ser
 	result.ReqId = -1
 	result.Response = &service.Result_ApiIdentity{ApiIdentity: clientIdt}
 
-	logger.Printf("New client initiated: %s, %+v", clientIdt, c)
+	log.Printf("New client initiated: %s, %+v", clientIdt, c)
 
 	return
 }
@@ -163,7 +157,7 @@ func (hub *RiskHub) Release(ctx context.Context, req *service.Request) (empty *e
 
 	empty = &emptypb.Empty{}
 
-	logger.Printf("Releasing risk api: %s", req.GetApiIdentity())
+	log.Printf("Releasing risk api: %s", req.GetApiIdentity())
 
 	return
 }
@@ -194,7 +188,7 @@ func (hub *RiskHub) ReqUserLogin(ctx context.Context, req *service.Request) (res
 				UserLogin: service.ConvertRspLogin(&c.api.state.rspLogin),
 			}
 
-			logger.Printf("Client login with api cache: %s", c)
+			log.Printf("Client login with api cache: %s", c)
 		} else {
 			err = errors.New("[grpc] Invalid username or password")
 		}
@@ -407,6 +401,7 @@ func (hub *RiskHub) SubInvestorOrder(req *service.Request, stream service.RohonM
 	subID, ch := ordFlow.Subscribe(
 		c.String(), core.Quick,
 	)
+	defer ordFlow.UnSubscribe(subID)
 
 	filter := req.GetInvestor()
 
@@ -461,6 +456,7 @@ func (hub *RiskHub) SubInvestorTrade(req *service.Request, stream service.RohonM
 	subID, ch := tdFlow.Subscribe(
 		c.String(), core.Quick,
 	)
+	defer tdFlow.UnSubscribe(subID)
 
 	filter := req.GetInvestor()
 
@@ -515,6 +511,7 @@ func (hub *RiskHub) SubInvestorMoney(req *service.Request, stream service.RohonM
 	subID, ch := acctFlow.Subscribe(
 		c.String(), core.Quick,
 	)
+	defer acctFlow.UnSubscribe(subID)
 
 	filter := req.GetInvestor()
 
@@ -569,6 +566,7 @@ func (hub *RiskHub) SubInvestorPosition(req *service.Request, stream service.Roh
 	subID, ch := posFlow.Subscribe(
 		c.String(), core.Quick,
 	)
+	defer posFlow.UnSubscribe(subID)
 
 	filter := req.GetInvestor()
 

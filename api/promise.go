@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -247,7 +248,7 @@ func (r *BatchResult[T]) AppendRequest(reqID int64, execCode int) {
 		}
 	}
 
-	logger.Printf("Append request: %d, %d", reqID, execCode)
+	log.Printf("Append request: %d, %d", reqID, execCode)
 }
 
 func (r *BatchResult[T]) GetExecCode() int {
@@ -278,7 +279,7 @@ func (r *BatchResult[T]) AppendResult(reqID int64, v *T, info *rhmonitor4go.RspI
 	cache, exist := r.rspCache[reqID]
 
 	if !exist {
-		logger.Printf(
+		log.Printf(
 			"Appended RequestID[%d] not exist in BatchResult", reqID,
 		)
 
@@ -429,7 +430,7 @@ func (r *SingleResult[T]) GetError() (err error) {
 
 func (r *SingleResult[T]) AppendResult(reqID int64, v *T, rsp *rhmonitor4go.RspInfo, isLast bool) {
 	if reqID != r.requestID {
-		logger.Printf(
+		log.Printf(
 			"Appended RequestID[%d] miss match with Result[%d]",
 			reqID, r.requestID,
 		)

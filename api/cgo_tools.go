@@ -17,11 +17,6 @@ import (
 	"golang.org/x/text/transform"
 )
 
-var logger = log.New(
-	log.Default().Writer(),
-	"[rhmonitor4go.api] ", log.Flags()|log.Lmicroseconds,
-)
-
 func GbkToUtf8(s []byte) ([]byte, error) {
 	reader := transform.NewReader(bytes.NewReader(s), simplifiedchinese.GBK.NewDecoder())
 	d, e := io.ReadAll(reader)
@@ -37,7 +32,7 @@ func CStr2GoStr(in unsafe.Pointer) string {
 	utf8Data, err := GbkToUtf8(gbkData)
 
 	if err != nil {
-		logger.Printf("Decode gbk msg faild: %v", err)
+		log.Printf("Decode gbk msg faild: %v", err)
 	}
 
 	return string(utf8Data)

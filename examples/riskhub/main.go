@@ -25,7 +25,7 @@ var (
 )
 
 func init() {
-	log.SetFlags(log.Flags() | log.Lmicroseconds)
+	log.SetFlags(log.Flags() | log.Lmicroseconds | log.Lshortfile)
 
 	flag.StringVar(&rpcAddr, "addr", rpcAddr, "gRPC listen addr")
 	flag.IntVar(&rpcPort, "port", rpcPort, "gRPC listen port")

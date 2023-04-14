@@ -9,6 +9,7 @@ package api
 import "C"
 import (
 	"fmt"
+	"log"
 	"net"
 	"reflect"
 	"sync"
@@ -100,12 +101,12 @@ func (api *RHMonitorApi) ReqUserLogin(login *rhmonitor4go.RiskUser) (int64, int)
 	if login != nil {
 		api.riskUser = *login
 	} else {
-		logger.Printf("No risk user info.")
+		log.Printf("No risk user info.")
 		return -1, -255
 	}
 
 	return reqID, api.requests.WaitConnectedAndDo(func() int {
-		logger.Printf("Request user login with cache: %+v", login)
+		log.Printf("Request user login with cache: %+v", login)
 
 		return int(C.ReqUserLogin(
 			api.cInstance,
@@ -118,7 +119,7 @@ func (api *RHMonitorApi) ReqUserLogin(login *rhmonitor4go.RiskUser) (int64, int)
 func (api *RHMonitorApi) ReqUserLogout() (int64, int) {
 	var reqID int64
 
-	logger.Printf("Request user logout: %+v", api.riskUser)
+	log.Printf("Request user logout: %+v", api.riskUser)
 
 	return reqID, int(C.ReqUserLogout(
 		api.cInstance,
@@ -131,7 +132,7 @@ func (api *RHMonitorApi) ReqQryMonitorAccounts() (int64, int) {
 	var reqID int64
 
 	return reqID, api.requests.WaitLoginAndDo(func() int {
-		logger.Println("Request query monitor accounts with cache.")
+		log.Println("Request query monitor accounts with cache.")
 
 		return int(C.ReqQryMonitorAccounts(
 			api.cInstance,
@@ -146,7 +147,7 @@ func (api *RHMonitorApi) ExecReqQryInvestorMoney(investor *rhmonitor4go.Investor
 
 	api.requests.WaitLogin()
 
-	logger.Printf("Request query investor's money w/o cache: %+v", investor)
+	log.Printf("Request query investor's money w/o cache: %+v", investor)
 
 	return reqID, int(C.ReqQryInvestorMoney(
 		api.cInstance,
@@ -159,7 +160,7 @@ func (api *RHMonitorApi) ReqQryInvestorMoney(investor *rhmonitor4go.Investor) (i
 	var reqID int64
 
 	return reqID, api.requests.WaitLoginAndDo(func() int {
-		logger.Printf("Request query investor's money with cache: %+v", investor)
+		log.Printf("Request query investor's money with cache: %+v", investor)
 
 		return int(C.ReqQryInvestorMoney(
 			api.cInstance,
@@ -171,13 +172,13 @@ func (api *RHMonitorApi) ReqQryInvestorMoney(investor *rhmonitor4go.Investor) (i
 
 func (api *RHMonitorApi) ReqQryAllInvestorMoney() int {
 	return api.requests.WaitInvestorReadyAndDo(func() (rtn int) {
-		logger.Printf("Request query all investor's money with cache.")
+		log.Printf("Request query all investor's money with cache.")
 
 		api.investors.ForEach(func(_ string, investor *rhmonitor4go.Investor) bool {
 			_, rtn = api.ExecReqQryInvestorMoney(investor)
 
 			if rtn != 0 {
-				logger.Printf("Query money for user[%s] failed: %d", investor.InvestorID, rtn)
+				log.Printf("Query money for user[%s] failed: %d", investor.InvestorID, rtn)
 				return false
 			}
 
@@ -192,7 +193,7 @@ func (api *RHMonitorApi) ExecReqQryInvestorPosition(investor *rhmonitor4go.Inves
 
 	api.requests.WaitLogin()
 
-	logger.Printf("Query investor's position w/o cache: %+v @ %s", investor, instrumentID)
+	log.Printf("Query investor's position w/o cache: %+v @ %s", investor, instrumentID)
 
 	return reqID, int(C.ReqQryInvestorPosition(
 		api.cInstance,
@@ -205,7 +206,7 @@ func (api *RHMonitorApi) ReqQryInvestorPosition(investor *rhmonitor4go.Investor,
 	var reqID int64
 
 	return reqID, api.requests.WaitLoginAndDo(func() int {
-		logger.Printf("Query investor's position with cache: %+v @ %s", investor, instrumentID)
+		log.Printf("Query investor's position with cache: %+v @ %s", investor, instrumentID)
 
 		return int(C.ReqQryInvestorPosition(
 			api.cInstance,
@@ -217,13 +218,13 @@ func (api *RHMonitorApi) ReqQryInvestorPosition(investor *rhmonitor4go.Investor,
 
 func (api *RHMonitorApi) ReqQryAllInvestorPosition() int {
 	return api.requests.WaitInvestorReadyAndDo(func() (rtn int) {
-		logger.Printf("Request query all investor's position with cache.")
+		log.Printf("Request query all investor's position with cache.")
 
 		api.investors.ForEach(func(_ string, investor *rhmonitor4go.Investor) bool {
 			_, rtn = api.ExecReqQryInvestorPosition(investor, "")
 
 			if rtn != 0 {
-				logger.Printf("Qeury postion for user[%s] failed: %d", investor.InvestorID, rtn)
+				log.Printf("Qeury postion for user[%s] failed: %d", investor.InvestorID, rtn)
 				return false
 			}
 
@@ -235,7 +236,7 @@ func (api *RHMonitorApi) ReqQryAllInvestorPosition() int {
 }
 
 func (api *RHMonitorApi) ReqOffsetOrder(offsetOrder *rhmonitor4go.OffsetOrder) (int64, int) {
-	logger.Printf("ReqOffsetOrder not implied: %+v", offsetOrder)
+	log.Printf("ReqOffsetOrder not implied: %+v", offsetOrder)
 	return -1, -255
 }
 
@@ -244,7 +245,7 @@ func (api *RHMonitorApi) ExecReqSubPushInfo(sub *rhmonitor4go.SubInfo) (int64, i
 
 	api.requests.WaitLogin()
 
-	logger.Printf("Request sub info w/o cache: %+v", sub)
+	log.Printf("Request sub info w/o cache: %+v", sub)
 
 	return reqID, int(C.ReqSubPushInfo(
 		api.cInstance,
@@ -257,7 +258,7 @@ func (api *RHMonitorApi) ReqSubPushInfo(sub *rhmonitor4go.SubInfo) (int64, int) 
 	var reqID int64
 
 	return reqID, api.requests.WaitLoginAndDo(func() int {
-		logger.Printf("Request sub info with cache: %+v", sub)
+		log.Printf("Request sub info with cache: %+v", sub)
 
 		return int(C.ReqSubPushInfo(
 			api.cInstance,
@@ -289,13 +290,13 @@ func (api *RHMonitorApi) ReqSubInvestorOrder(investor *rhmonitor4go.Investor) (i
 
 func (api *RHMonitorApi) ReqSubAllInvestorOrder() int {
 	return api.requests.WaitInvestorReadyAndDo(func() (rtn int) {
-		logger.Printf("Request sub all investor[%d]'s order with cache.", api.investors.Size())
+		log.Printf("Request sub all investor[%d]'s order with cache.", api.investors.Size())
 
 		api.investors.ForEach(func(_ string, investor *rhmonitor4go.Investor) bool {
 			_, rtn = api.ExecReqSubInvestorOrder(investor)
 
 			if rtn != 0 {
-				logger.Printf("Sub investor[%s]'s order failed: %d", investor.InvestorID, rtn)
+				log.Printf("Sub investor[%s]'s order failed: %d", investor.InvestorID, rtn)
 				return false
 			}
 
@@ -329,13 +330,13 @@ func (api *RHMonitorApi) ReqSubInvestorTrade(investor *rhmonitor4go.Investor) (i
 
 func (api *RHMonitorApi) ReqSubAllInvestorTrade() int {
 	return api.requests.WaitInvestorReadyAndDo(func() (rtn int) {
-		logger.Printf("Request sub all investor[%d]'s trade info with cache.", api.investors.Size())
+		log.Printf("Request sub all investor[%d]'s trade info with cache.", api.investors.Size())
 
 		api.investors.ForEach(func(_ string, investor *rhmonitor4go.Investor) bool {
 			_, rtn = api.ExecReqSubInvestorTrade(investor)
 
 			if rtn != 0 {
-				logger.Printf("Sub investor[%s]'s trade failed: %d", investor.InvestorID, rtn)
+				log.Printf("Sub investor[%s]'s trade failed: %d", investor.InvestorID, rtn)
 				return false
 			}
 
@@ -350,13 +351,13 @@ func (api *RHMonitorApi) HandleConnected() {
 	api.requests.SetConnected(true)
 
 	if rtn := api.requests.RedoConnected(); rtn != 0 {
-		logger.Printf("Redo connected failed with error: %d", rtn)
+		log.Printf("Redo connected failed with error: %d", rtn)
 	}
 }
 
 func (api *RHMonitorApi) OnFrontConnected() {
 	api.HandleConnected()
-	logger.Printf("Rohon risk[%s:%d] connected.", api.remoteAddr, api.remotePort)
+	log.Printf("Rohon risk[%s:%d] connected.", api.remoteAddr, api.remotePort)
 }
 
 func (api *RHMonitorApi) HandleDisconnected() {
@@ -367,7 +368,7 @@ func (api *RHMonitorApi) HandleDisconnected() {
 
 func (api *RHMonitorApi) OnFrontDisconnected(reason rhmonitor4go.Reason) {
 	api.HandleDisconnected()
-	logger.Printf("Rohon risk[%s:%d] disconnected: %s", api.remoteAddr, api.remotePort, reason)
+	log.Printf("Rohon risk[%s:%d] disconnected: %s", api.remoteAddr, api.remotePort, reason)
 }
 
 func (api *RHMonitorApi) HandleLogin(login *rhmonitor4go.RspUserLogin) {
@@ -375,23 +376,23 @@ func (api *RHMonitorApi) HandleLogin(login *rhmonitor4go.RspUserLogin) {
 		api.requests.SetLogin(true)
 
 		if rtn := api.requests.RedoLoggedIn(); rtn != 0 {
-			logger.Printf("Redo login failed with error: %d", rtn)
+			log.Printf("Redo login failed with error: %d", rtn)
 		}
 	} else {
-		logger.Print("User login response data is nil.")
+		log.Print("User login response data is nil.")
 	}
 }
 
 func (api *RHMonitorApi) OnRspUserLogin(login *rhmonitor4go.RspUserLogin, info *rhmonitor4go.RspInfo, requestID int64) {
 	if err := CheckRspInfo(info); err != nil {
-		logger.Printf("User[%s] login failed: %v", api.riskUser.UserID, err)
+		log.Printf("User[%s] login failed: %v", api.riskUser.UserID, err)
 		return
 	}
 
 	api.HandleLogin(login)
 
 	if login != nil {
-		logger.Printf("User[%s] logged in: %s %s", api.riskUser.UserID, login.TradingDay, login.LoginTime)
+		log.Printf("User[%s] logged in: %s %s", api.riskUser.UserID, login.TradingDay, login.LoginTime)
 	}
 }
 
@@ -399,18 +400,18 @@ func (api *RHMonitorApi) HandleLogout(logout *rhmonitor4go.RspUserLogout) {
 	if logout != nil {
 		api.requests.SetLogin(false)
 	} else {
-		logger.Print("User logout response data is nil.")
+		log.Print("User logout response data is nil.")
 	}
 }
 
 func (api *RHMonitorApi) OnRspUserLogout(logout *rhmonitor4go.RspUserLogout, info *rhmonitor4go.RspInfo, requestID int64) {
 	if err := CheckRspInfo(info); err != nil {
-		logger.Printf("User logout failed: %v", err)
+		log.Printf("User logout failed: %v", err)
 		return
 	}
 
 	if logout != nil {
-		logger.Printf("User[%s] logged out.", logout.UserID)
+		log.Printf("User[%s] logged out.", logout.UserID)
 	}
 }
 
@@ -428,14 +429,14 @@ func (api *RHMonitorApi) HandleInvestor(investor *rhmonitor4go.Investor, isLast 
 
 func (api *RHMonitorApi) OnRspQryMonitorAccounts(investor *rhmonitor4go.Investor, info *rhmonitor4go.RspInfo, requestID int64, isLast bool) {
 	if err := CheckRspInfo(info); err != nil {
-		logger.Printf("Monitor account query failed: %v", err)
+		log.Printf("Monitor account query failed: %v", err)
 		return
 	}
 
 	api.HandleInvestor(investor, isLast)
 
 	if isLast {
-		logger.Printf("All monitor account query finished: %d", api.investors.Size())
+		log.Printf("All monitor account query finished: %d", api.investors.Size())
 
 		api.investors.ForEach(func(_ string, investor *rhmonitor4go.Investor) bool {
 			printData("OnRspQryMonitorAccounts", investor)
@@ -446,7 +447,7 @@ func (api *RHMonitorApi) OnRspQryMonitorAccounts(investor *rhmonitor4go.Investor
 
 func (api *RHMonitorApi) OnRspQryInvestorMoney(account *rhmonitor4go.Account, info *rhmonitor4go.RspInfo, requestID int64, isLast bool) {
 	if err := CheckRspInfo(info); err != nil {
-		logger.Printf("Investor money query failed: %v", err)
+		log.Printf("Investor money query failed: %v", err)
 		return
 	}
 
@@ -455,7 +456,7 @@ func (api *RHMonitorApi) OnRspQryInvestorMoney(account *rhmonitor4go.Account, in
 
 func (api *RHMonitorApi) OnRspQryInvestorPosition(position *rhmonitor4go.Position, info *rhmonitor4go.RspInfo, requestID int64, isLast bool) {
 	if err := CheckRspInfo(info); err != nil {
-		logger.Printf("Investor position query failed: %v", err)
+		log.Printf("Investor position query failed: %v", err)
 
 		return
 	}
@@ -463,13 +464,13 @@ func (api *RHMonitorApi) OnRspQryInvestorPosition(position *rhmonitor4go.Positio
 	printData("OnRspQryInvestorPosition", position)
 
 	if isLast {
-		logger.Printf("Query investor[%s]'s position finished.", position.InvestorID)
+		log.Printf("Query investor[%s]'s position finished.", position.InvestorID)
 	}
 }
 
 func (api *RHMonitorApi) OnRspOffsetOrder(offsetOrd *rhmonitor4go.OffsetOrder, info *rhmonitor4go.RspInfo, requestID int64, isLast bool) {
 	if err := CheckRspInfo(info); err != nil {
-		logger.Printf(
+		log.Printf(
 			"Offset order[%s %s: %d@%f] for investor[%s] failed: %v",
 			offsetOrd.Direction, offsetOrd.InstrumentID,
 			offsetOrd.Volume, offsetOrd.Price,
@@ -492,40 +493,40 @@ func (api *RHMonitorApi) OnRtnTrade(trade *rhmonitor4go.Trade) {
 
 func (api *RHMonitorApi) OnRspQryOrder(order *rhmonitor4go.Order, info *rhmonitor4go.RspInfo, requestID int64, isLast bool) {
 	if err := CheckRspInfo(info); err != nil {
-		logger.Printf("Order query failed: %+v", err)
+		log.Printf("Order query failed: %+v", err)
 		return
 	}
 
 	printData("OnRspQryOrder", order)
 
 	if isLast {
-		logger.Printf("Query investor[%s]'s order finished.", order.AccountID)
+		log.Printf("Query investor[%s]'s order finished.", order.AccountID)
 	}
 }
 
 func (api *RHMonitorApi) OnRspQryTrade(trade *rhmonitor4go.Trade, info *rhmonitor4go.RspInfo, requestID int64, isLast bool) {
 	if err := CheckRspInfo(info); err != nil {
-		logger.Printf("Trade query failed: %+v", err)
+		log.Printf("Trade query failed: %+v", err)
 		return
 	}
 
 	printData("OnRspQryTrade", trade)
 
 	if isLast {
-		logger.Printf("Query investor[%s]'s trade finished.", trade.InvestorID)
+		log.Printf("Query investor[%s]'s trade finished.", trade.InvestorID)
 	}
 }
 
 func (api *RHMonitorApi) OnRspQryInstrument(ins *rhmonitor4go.Instrument, info *rhmonitor4go.RspInfo, requestID int64, isLast bool) {
 	if err := CheckRspInfo(info); err != nil {
-		logger.Printf("Instrument query failed: %+v", err)
+		log.Printf("Instrument query failed: %+v", err)
 		return
 	}
 
 	printData("OnRspQryInstrument", ins)
 
 	if isLast {
-		logger.Print("Query instrument order finished.")
+		log.Print("Query instrument order finished.")
 	}
 }
 
@@ -563,7 +564,7 @@ func (api *RHMonitorApi) Init(brokerID, addr string, port int, spi RHRiskSpi) er
 		}
 		RegisterRHRiskSpi(api.cInstance, spi)
 
-		logger.Printf("Initializing risk api for: %s:%d", ip, port)
+		log.Printf("Initializing risk api for: %s:%d", ip, port)
 		C.Init(api.cInstance, C.CString(ip.String()), C.uint(port))
 	})
 
@@ -582,7 +583,7 @@ func NewRHMonitorApi(brokerID, addr string, port int) *RHMonitorApi {
 	api := RHMonitorApi{}
 
 	if err := api.Init(brokerID, addr, port, nil); err != nil {
-		logger.Printf("Create RHMonitorApi failed: %+v", err)
+		log.Printf("Create RHMonitorApi failed: %+v", err)
 		return nil
 	}
 
