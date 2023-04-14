@@ -8,12 +8,8 @@ import (
 	"log"
 	"net"
 	"os"
-	"time"
 
 	"github.com/frozenpine/rhmonitor4go/service/hub"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/keepalive"
 )
 
 var (
@@ -69,18 +65,10 @@ func main() {
 		ClientCAs:    caPool,
 	}
 
-	grpcSvr := grpc.NewServer(
-		grpc.Creds(credentials.NewTLS(&tlsConfig)),
-		grpc.KeepaliveParams(keepalive.ServerParameters{
-			Time:    5 * time.Second,
-			Timeout: 10 * time.Second,
-		}),
-	)
-	// grpcSvr := grpc.NewServer()
-	hub.NewRohonMonitorHub(grpcSvr)
+	hubSvr := hub.NewRohonMonitorHub(nil, &tlsConfig)
 
 	log.Printf("Starting gRPC server")
-	if err := grpcSvr.Serve(listen); err != nil {
+	if err := hubSvr.Serve(listen); err != nil {
 		log.Fatalf("Starting gRPC failed: %+v", err)
 	}
 }

@@ -2,8 +2,12 @@ package hub
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"log"
+	"net"
+	"os"
+	"os/signal"
 	"sync"
 	"time"
 
@@ -15,6 +19,8 @@ import (
 	"github.com/gofrs/uuid"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/peer"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
@@ -28,11 +34,15 @@ var (
 type RiskHub struct {
 	service.UnimplementedRohonMonitorServer
 
+	ctx             context.Context
+	cancel          context.CancelFunc
 	svr             *grpc.Server
 	clientCache     sync.Map
 	apiCache        sync.Map
 	apiClientMapper sync.Map
 	apiReqTimeout   time.Duration
+
+	metrics promMetrics
 }
 
 func (hub *RiskHub) loadClient(idt string) (*client, error) {
@@ -672,9 +682,62 @@ func (hub *RiskHub) SubBroadcast(req *service.Request, stream service.RohonMonit
 	return
 }
 
-func NewRohonMonitorHub(svr *grpc.Server) service.RohonMonitorServer {
+func (hub *RiskHub) Serve(listen net.Listener) (err error) {
+	go func() {
+		if err = hub.svr.Serve(listen); err != nil {
+			hub.cancel()
+		}
+	}()
+
+	<-hub.ctx.Done()
+
+	if err != nil {
+		gracefulStop := make(chan struct{})
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+
+		log.Printf("Waiting 10 seconds to graceful stop grpc server.")
+		go func() {
+			hub.svr.GracefulStop()
+			close(gracefulStop)
+		}()
+
+		select {
+		case <-ctx.Done():
+			log.Printf("Waiting timeout, stop grpc server forcelly.")
+			hub.svr.Stop()
+		case <-gracefulStop:
+			log.Printf("Server stopped gracefully.")
+		}
+		cancel()
+	}
+
+	return
+}
+
+func NewRohonMonitorHub(ctx context.Context, tls *tls.Config) *RiskHub {
+	var cancel context.CancelFunc
+
+	if ctx == nil {
+		ctx, cancel = signal.NotifyContext(
+			context.Background(),
+			os.Interrupt, os.Kill,
+		)
+	} else {
+		ctx, cancel = context.WithCancel(ctx)
+	}
+
+	svr := grpc.NewServer(
+		grpc.Creds(credentials.NewTLS(tls)),
+		grpc.KeepaliveParams(keepalive.ServerParameters{
+			Time:    5 * time.Second,
+			Timeout: 10 * time.Second,
+		}),
+	)
+
 	pb := &RiskHub{
-		svr: svr,
+		ctx:    ctx,
+		cancel: cancel,
+		svr:    svr,
 	}
 
 	service.RegisterRohonMonitorServer(svr, pb)
