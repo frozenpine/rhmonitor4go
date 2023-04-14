@@ -2,7 +2,6 @@ package hub
 
 import (
 	"bytes"
-	"context"
 	"strconv"
 	"sync/atomic"
 
@@ -16,20 +15,21 @@ var (
 )
 
 type client struct {
-	ctx   context.Context
+	// ctx   context.Context
+	idt   string
 	peer  *peer.Peer
 	api   *grpcRiskApi
 	login atomic.Bool
 	// orderStream
 }
 
-func (c *client) checkConnect() error {
-	if c.api.isConnected() {
-		return nil
-	}
+// func (c *client) checkConnect() error {
+// 	if c.api.isConnected() {
+// 		return nil
+// 	}
 
-	return errors.New("[grpc] please wait for connected")
-}
+// 	return errors.New("[grpc] please wait for connected")
+// }
 
 func (c *client) checkLogin() error {
 	if c.login.Load() && c.api.isLoggedIn() {
@@ -41,9 +41,9 @@ func (c *client) checkLogin() error {
 	return errors.New("[grpc] please login first")
 }
 
-func (c *client) disconnect() {
-	// c.ctx.
-}
+// func (c *client) disconnect() {
+// 	// c.ctx.
+// }
 
 func (c *client) String() string {
 	result := bytes.NewBuffer(nil)
