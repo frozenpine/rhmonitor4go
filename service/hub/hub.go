@@ -715,15 +715,8 @@ func (hub *RiskHub) Serve(listen net.Listener) (err error) {
 }
 
 func NewRohonMonitorHub(ctx context.Context, tls *tls.Config) *RiskHub {
-	var cancel context.CancelFunc
-
 	if ctx == nil {
-		ctx, cancel = signal.NotifyContext(
-			context.Background(),
-			os.Interrupt, os.Kill,
-		)
-	} else {
-		ctx, cancel = context.WithCancel(ctx)
+		ctx = context.Background()
 	}
 
 	svr := grpc.NewServer(
@@ -732,13 +725,42 @@ func NewRohonMonitorHub(ctx context.Context, tls *tls.Config) *RiskHub {
 			Time:    5 * time.Second,
 			Timeout: 10 * time.Second,
 		}),
+		grpc.UnaryInterceptor(
+			func(ctx context.Context,
+				req interface{},
+				info *grpc.UnaryServerInfo,
+				handler grpc.UnaryHandler,
+			) (resp interface{}, err error) {
+				method := info.FullMethod
+
+				log.Printf("gRPC method %s called.", method)
+
+				return handler(ctx, req)
+			},
+		),
+		grpc.StreamInterceptor(
+			func(
+				srv interface{},
+				ss grpc.ServerStream,
+				info *grpc.StreamServerInfo,
+				handler grpc.StreamHandler,
+			) error {
+				method := info.FullMethod
+
+				log.Printf("gRPC method %s called.", method)
+
+				return handler(srv, ss)
+			},
+		),
 	)
 
 	pb := &RiskHub{
-		ctx:    ctx,
-		cancel: cancel,
-		svr:    svr,
+		svr: svr,
 	}
+	pb.ctx, pb.cancel = signal.NotifyContext(
+		ctx,
+		os.Interrupt, os.Kill,
+	)
 
 	service.RegisterRohonMonitorServer(svr, pb)
 
