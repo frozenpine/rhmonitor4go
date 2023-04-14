@@ -82,7 +82,7 @@ func (hub *RiskHub) loadAndDelApiInstance(idt string) (*grpcRiskApi, error) {
 func (hub *RiskHub) newClient(
 	ctx context.Context,
 	api *grpcRiskApi,
-) (string, *client) {
+) *client {
 	peer, _ := peer.FromContext(ctx)
 
 	idt := uuid.NewV3(
@@ -91,13 +91,14 @@ func (hub *RiskHub) newClient(
 	).String()
 
 	c, _ := hub.clientCache.LoadOrStore(idt, &client{
+		idt:  idt,
 		peer: peer,
 		api:  api,
 	})
 
 	hub.apiClientMapper.Store(frontToIdentity(api.front), ctx)
 
-	return idt, c.(*client)
+	return c.(*client)
 }
 
 func (hub *RiskHub) Init(ctx context.Context, req *service.Request) (result *service.Result, err error) {
@@ -138,20 +139,21 @@ func (hub *RiskHub) Init(ctx context.Context, req *service.Request) (result *ser
 		}
 	}
 
-	clientIdt, c := hub.newClient(ctx, api)
+	c := hub.newClient(ctx, api)
 
 	result = &service.Result{}
 
 	result.ReqId = -1
-	result.Response = &service.Result_ApiIdentity{ApiIdentity: clientIdt}
+	result.Response = &service.Result_ApiIdentity{ApiIdentity: c.idt}
 
-	log.Printf("New client initiated: %s, %+v", clientIdt, c)
+	log.Printf("New client initiated: %s, %+v", c.idt, c)
 
 	return
 }
 
 func (hub *RiskHub) Release(ctx context.Context, req *service.Request) (empty *emptypb.Empty, err error) {
 	if _, err = hub.loadAndDelClient(req.GetApiIdentity()); err != nil {
+		log.Printf("Client not found: %+v", err)
 		return
 	}
 
@@ -166,6 +168,7 @@ func (hub *RiskHub) ReqUserLogin(ctx context.Context, req *service.Request) (res
 	var c *client
 
 	if c, err = hub.loadClient(req.GetApiIdentity()); err != nil {
+		log.Printf("Client not found: %+v", err)
 		return
 	}
 
@@ -228,6 +231,7 @@ func (hub *RiskHub) ReqUserLogin(ctx context.Context, req *service.Request) (res
 func (hub *RiskHub) ReqUserLogout(ctx context.Context, req *service.Request) (result *service.Result, err error) {
 	var c *client
 	if c, err = hub.loadAndDelClient(req.GetApiIdentity()); err != nil {
+		log.Printf("Client not found: %+v", err)
 		return
 	}
 
@@ -235,6 +239,7 @@ func (hub *RiskHub) ReqUserLogout(ctx context.Context, req *service.Request) (re
 
 	if err = c.checkLogin(); err != nil {
 		result.ReqId = -1
+		log.Printf("Client not logged in: %+v", err)
 		return
 	}
 
@@ -269,6 +274,7 @@ func (hub *RiskHub) ReqUserLogout(ctx context.Context, req *service.Request) (re
 func (hub *RiskHub) ReqQryMonitorAccounts(ctx context.Context, req *service.Request) (result *service.Result, err error) {
 	var c *client
 	if c, err = hub.loadClient(req.GetApiIdentity()); err != nil {
+		log.Printf("Client not found: %+v", err)
 		return
 	}
 
@@ -276,6 +282,7 @@ func (hub *RiskHub) ReqQryMonitorAccounts(ctx context.Context, req *service.Requ
 
 	if err = c.checkLogin(); err != nil {
 		result.ReqId = -1
+		log.Printf("Client not logged in: %+v", err)
 		return
 	}
 
@@ -311,6 +318,7 @@ func (hub *RiskHub) ReqQryMonitorAccounts(ctx context.Context, req *service.Requ
 func (hub *RiskHub) ReqQryInvestorMoney(ctx context.Context, req *service.Request) (result *service.Result, err error) {
 	var c *client
 	if c, err = hub.loadClient(req.GetApiIdentity()); err != nil {
+		log.Printf("Client not found: %+v", err)
 		return
 	}
 
@@ -318,6 +326,7 @@ func (hub *RiskHub) ReqQryInvestorMoney(ctx context.Context, req *service.Reques
 
 	if err = c.checkLogin(); err != nil {
 		result.ReqId = -1
+		log.Printf("Client not logged in: %+v", err)
 		return
 	}
 
@@ -366,10 +375,12 @@ func (hub *RiskHub) ReqQryInvestorMoney(ctx context.Context, req *service.Reques
 func (hub *RiskHub) SubInvestorOrder(req *service.Request, stream service.RohonMonitor_SubInvestorOrderServer) (err error) {
 	var c *client
 	if c, err = hub.loadClient(req.GetApiIdentity()); err != nil {
+		log.Printf("Client not found: %+v", err)
 		return
 	}
 
 	if err = c.checkLogin(); err != nil {
+		log.Printf("Client not logged in: %+v", err)
 		return
 	}
 
@@ -405,26 +416,36 @@ func (hub *RiskHub) SubInvestorOrder(req *service.Request, stream service.RohonM
 
 	filter := req.GetInvestor()
 
-	for ord := range ch {
-		if filter != nil && ord.AccountID != filter.InvestorId {
-			continue
+	for {
+		select {
+		case <-stream.Context().Done():
+			log.Printf("Client[%s] disconnected.", c.idt)
+			err = ordFlow.UnSubscribe(subID)
+			return
+		case ord := <-ch:
+			if ord == nil {
+				log.Print("Nil pointer in order flow")
+				continue
+			}
+
+			if filter != nil && ord.AccountID != filter.InvestorId {
+				continue
+			}
+
+			stream.Send(service.ConvertOrder(ord))
 		}
-
-		stream.Send(service.ConvertOrder(ord))
 	}
-
-	err = ordFlow.UnSubscribe(subID)
-
-	return
 }
 
 func (hub *RiskHub) SubInvestorTrade(req *service.Request, stream service.RohonMonitor_SubInvestorTradeServer) (err error) {
 	var c *client
 	if c, err = hub.loadClient(req.GetApiIdentity()); err != nil {
+		log.Printf("Client not found: %+v", err)
 		return
 	}
 
 	if err = c.checkLogin(); err != nil {
+		log.Printf("Client not logged in: %+v", err)
 		return
 	}
 
@@ -460,26 +481,36 @@ func (hub *RiskHub) SubInvestorTrade(req *service.Request, stream service.RohonM
 
 	filter := req.GetInvestor()
 
-	for td := range ch {
-		if filter != nil && td.InvestorID != filter.InvestorId {
-			continue
+	for {
+		select {
+		case <-stream.Context().Done():
+			log.Printf("Client[%s] disconnected.", c.idt)
+			err = tdFlow.UnSubscribe(subID)
+			return
+		case td := <-ch:
+			if td == nil {
+				log.Print("Nil pointer in trade flow")
+				continue
+			}
+
+			if filter != nil && td.InvestorID != filter.InvestorId {
+				continue
+			}
+
+			stream.Send(service.ConvertTrade(td))
 		}
-
-		stream.Send(service.ConvertTrade(td))
 	}
-
-	err = tdFlow.UnSubscribe(subID)
-
-	return
 }
 
 func (hub *RiskHub) SubInvestorMoney(req *service.Request, stream service.RohonMonitor_SubInvestorMoneyServer) (err error) {
 	var c *client
 	if c, err = hub.loadClient(req.GetApiIdentity()); err != nil {
+		log.Printf("Client not found: %+v", err)
 		return
 	}
 
 	if err = c.checkLogin(); err != nil {
+		log.Printf("Client not logged in: %+v", err)
 		return
 	}
 
@@ -515,26 +546,36 @@ func (hub *RiskHub) SubInvestorMoney(req *service.Request, stream service.RohonM
 
 	filter := req.GetInvestor()
 
-	for acct := range ch {
-		if filter != nil && filter.InvestorId != acct.AccountID {
-			continue
+	for {
+		select {
+		case <-stream.Context().Done():
+			log.Printf("Client[%s] disconnected.", c.idt)
+			err = acctFlow.UnSubscribe(subID)
+			return
+		case acct := <-ch:
+			if acct == nil {
+				log.Print("Nil pointer in account flow")
+				continue
+			}
+
+			if filter != nil && filter.InvestorId != acct.AccountID {
+				continue
+			}
+
+			stream.Send(service.ConvertAccount(acct))
 		}
-
-		stream.Send(service.ConvertAccount(acct))
 	}
-
-	err = acctFlow.UnSubscribe(subID)
-
-	return
 }
 
 func (hub *RiskHub) SubInvestorPosition(req *service.Request, stream service.RohonMonitor_SubInvestorPositionServer) (err error) {
 	var c *client
 	if c, err = hub.loadClient(req.GetApiIdentity()); err != nil {
+		log.Printf("Client not found: %+v", err)
 		return
 	}
 
 	if err = c.checkLogin(); err != nil {
+		log.Printf("Client not logged in: %+v", err)
 		return
 	}
 
@@ -570,17 +611,25 @@ func (hub *RiskHub) SubInvestorPosition(req *service.Request, stream service.Roh
 
 	filter := req.GetInvestor()
 
-	for pos := range ch {
-		if filter != nil && filter.InvestorId != pos.InvestorID {
-			continue
+	for {
+		select {
+		case <-stream.Context().Done():
+			log.Printf("Client[%s] disconnected.", c.idt)
+			err = posFlow.UnSubscribe(subID)
+			return
+		case pos := <-ch:
+			if pos == nil {
+				log.Print("Nil pointer in position flow")
+				continue
+			}
+
+			if filter != nil && filter.InvestorId != pos.InvestorID {
+				continue
+			}
+
+			stream.Send(service.ConvertPosition(pos))
 		}
-
-		stream.Send(service.ConvertPosition(pos))
 	}
-
-	err = posFlow.UnSubscribe(subID)
-
-	return
 }
 
 func (hub *RiskHub) SubBroadcast(req *service.Request, stream service.RohonMonitor_SubBroadcastServer) (err error) {
