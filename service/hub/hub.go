@@ -41,8 +41,6 @@ type RiskHub struct {
 	apiCache        sync.Map
 	apiClientMapper sync.Map
 	apiReqTimeout   time.Duration
-
-	metrics promMetrics
 }
 
 func (hub *RiskHub) loadClient(idt string) (*client, error) {

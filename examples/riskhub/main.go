@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"flag"
@@ -65,7 +66,21 @@ func main() {
 		ClientCAs:    caPool,
 	}
 
-	hubSvr := hub.NewRohonMonitorHub(nil, &tlsConfig)
+	rootCtx, rootCancel := context.WithCancel(context.Background())
+	staticCtx, staticsCancel := context.WithCancel(rootCtx)
+
+	defer func() {
+		staticsCancel()
+		rootCancel()
+	}()
+
+	go func() {
+		if err := hub.StartDefaultStaticsServer(staticCtx); err != nil {
+			log.Printf("Start statics server failed: %+v", err)
+		}
+	}()
+
+	hubSvr := hub.NewRohonMonitorHub(rootCtx, &tlsConfig)
 
 	log.Printf("Starting gRPC server")
 	if err := hubSvr.Serve(listen); err != nil {
