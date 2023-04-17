@@ -88,7 +88,7 @@ func main() {
 			}
 		}
 
-		if err := hub.StartDefaultStaticsServer(staticCtx); err != nil {
+		if err := hub.StartStaticsServer(staticCtx, rpcAddr, -1); err != nil {
 			log.Printf("Start statics server failed: %+v", err)
 		}
 	}()

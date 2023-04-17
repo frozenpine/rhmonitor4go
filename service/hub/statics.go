@@ -73,8 +73,11 @@ func registerHandleFunc(uri string, handleFunc http.HandlerFunc) error {
 
 // StartStaticsServer start statics server
 func StartStaticsServer(ctx context.Context, addr string, port int) (err error) {
-	if addr == "" || port <= 0 {
+	if addr == "" {
 		addr = DefaultListenAddr
+	}
+
+	if port <= 0 {
 		port = DefaultServerPort
 	}
 
