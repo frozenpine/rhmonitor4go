@@ -1,0 +1,5 @@
+# systemctl version before 240
+if ($programname == "riskhub") then {
+   action(type="omfile" file="/var/log/riskhub/riskhub.log")
+   stop
+}

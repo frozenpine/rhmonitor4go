@@ -1,0 +1,10 @@
+{SOME_PATH_TO_RISKHUB}/log_files/*/*/*/*.log {
+    daily
+    missingok
+    rotate 7
+    compress
+    delaycompress
+    notifempty
+    # copytruncate 0640 risk risk
+    su risk risk
+}
