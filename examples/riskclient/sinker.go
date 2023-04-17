@@ -245,7 +245,7 @@ func (sink *AccountSinker) boundary(ts time.Time) {
 
 			close = accountList[count-1].Balance
 		} else {
-			close = open
+			close, high, low = open, open, open
 		}
 
 		bar := sink.newSinkBar()
