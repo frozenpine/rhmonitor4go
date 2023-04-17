@@ -19,6 +19,7 @@ var (
 	svrCert = "riskhub.crt"
 	svrKey  = "riskhub.key"
 	ca      = "ca.crt"
+	debug   = false
 )
 
 func init() {
@@ -29,6 +30,7 @@ func init() {
 	flag.StringVar(&svrCert, "cert", svrCert, "gRPC server cert path")
 	flag.StringVar(&svrKey, "key", svrKey, "gRPC server cert key path")
 	flag.StringVar(&ca, "ca", ca, "gRPC server cert CA path")
+	flag.BoolVar(&debug, "verbose", debug, "gRPC server debug switch")
 }
 
 func main() {
@@ -76,8 +78,14 @@ func main() {
 
 	go func() {
 		if err := hub.CollectPromStatics(""); err != nil {
-			log.Printf("Register promthues statics failed")
+			log.Printf("Register promthues statics failed: %+v", err)
 			return
+		}
+
+		if debug {
+			if err := hub.CollectPProfStatics(""); err != nil {
+				log.Printf("Register pprof for server failed: %+v", err)
+			}
 		}
 
 		if err := hub.StartDefaultStaticsServer(staticCtx); err != nil {

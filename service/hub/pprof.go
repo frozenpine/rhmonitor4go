@@ -2,6 +2,7 @@ package hub
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"net/http/pprof"
 	"sort"
@@ -35,7 +36,13 @@ func (p *profiles) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 }
 
 func (p *profiles) GetBaseURI() string {
-	return p.baseURI + "/" + p.name
+	uri := strings.Join([]string{p.baseURI, p.name}, "/")
+
+	if !strings.HasPrefix(uri, "/") {
+		uri = "/" + uri
+	}
+
+	return uri
 }
 
 func (p *profiles) GetPprofURI(name string) string {
@@ -73,10 +80,6 @@ func handleFunc(name string) http.HandlerFunc {
 
 // CollectPProfStatics collect pprof statics & expose on uri
 func CollectPProfStatics(uri string) error {
-	if !strings.HasPrefix(uri, "/") {
-		uri = "/" + uri
-	}
-
 	pprofDefine.baseURI = uri
 
 	if err := registerHandler(pprofDefine.GetBaseURI(), pprofDefine); err != nil {
@@ -89,6 +92,8 @@ func CollectPProfStatics(uri string) error {
 			pprof.Handler(profile),
 		); err != nil {
 			return err
+		} else {
+			log.Print("Register pprof profile at:", pprofDefine.GetPprofURI(profile))
 		}
 	}
 
@@ -98,8 +103,12 @@ func CollectPProfStatics(uri string) error {
 			handleFunc(name),
 		); err != nil {
 			return err
+		} else {
+			log.Print("Register pprof extra functions at:", pprofDefine.GetPprofURI(name))
 		}
 	}
+
+	log.Printf("Pprof URI registered, expose stats at \"%s\"", pprofDefine.GetBaseURI())
 
 	return nil
 }
