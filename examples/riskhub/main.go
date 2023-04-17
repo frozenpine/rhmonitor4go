@@ -75,6 +75,11 @@ func main() {
 	}()
 
 	go func() {
+		if err := hub.CollectPromStatics(""); err != nil {
+			log.Printf("Register promthues statics failed")
+			return
+		}
+
 		if err := hub.StartDefaultStaticsServer(staticCtx); err != nil {
 			log.Printf("Start statics server failed: %+v", err)
 		}

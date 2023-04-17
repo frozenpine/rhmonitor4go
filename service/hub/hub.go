@@ -733,7 +733,27 @@ func NewRohonMonitorHub(ctx context.Context, tls *tls.Config) *RiskHub {
 
 				log.Printf("gRPC method %s called.", method)
 
-				return handler(ctx, req)
+				reqCounter := requestCounter.WithLabelValues(method)
+				reqErrCounter := requestErrCounter.WithLabelValues(method)
+				durHistogram := responseDurHistogram.WithLabelValues(method)
+
+				if reqCounter != nil {
+					reqCounter.Inc()
+				}
+
+				start := time.Now()
+				rsp, err := handler(ctx, req)
+				if err != nil && reqErrCounter != nil {
+					reqCounter.Inc()
+				}
+				end := time.Now()
+
+				dur := end.Sub(start).Milliseconds()
+				if durHistogram != nil {
+					durHistogram.Observe(float64(dur))
+				}
+
+				return rsp, err
 			},
 		),
 		grpc.StreamInterceptor(
@@ -745,7 +765,16 @@ func NewRohonMonitorHub(ctx context.Context, tls *tls.Config) *RiskHub {
 			) error {
 				method := info.FullMethod
 
-				log.Printf("gRPC method %s called.", method)
+				gauge := streamConnGauge.WithLabelValues(method)
+				defer func() {
+					if gauge != nil {
+						gauge.Sub(1.0)
+					}
+				}()
+
+				if gauge != nil {
+					gauge.Inc()
+				}
 
 				return handler(srv, ss)
 			},

@@ -12,29 +12,60 @@ const (
 )
 
 var (
-	clientConnGauge      *prometheus.GaugeVec
-	apiInsGauge          *prometheus.GaugeVec
+	defines = [2]string{"rohon", "risk"}
+
+	streamConnGauge      *prometheus.GaugeVec
 	requestCounter       *prometheus.CounterVec
 	requestErrCounter    *prometheus.CounterVec
 	responseDurHistogram *prometheus.HistogramVec
 )
 
 func init() {
-	clientConnGauge = prometheus.NewGaugeVec(
+	streamConnGauge = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Namespace: "rohon",
-			Subsystem: "risk",
-			Name:      "client",
-			Help:      "",
+			Namespace: defines[0],
+			Subsystem: defines[1],
+			Name:      "stream",
+			Help:      "Risk stream client total number",
 		},
-		[]string{"count", "total"},
+		[]string{"method"},
+	)
+
+	requestCounter = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: defines[0],
+			Subsystem: defines[1],
+			Name:      "request",
+			Help:      "Risk api request count",
+		},
+		[]string{"method"},
+	)
+
+	requestErrCounter = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: defines[0],
+			Subsystem: defines[1],
+			Name:      "reqErr",
+			Help:      "Risk api request error count",
+		},
+		[]string{"method"},
+	)
+
+	responseDurHistogram = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Namespace: defines[0],
+			Subsystem: defines[1],
+			Name:      "reqDur",
+			Help:      "Risk api request duration histogram",
+			Buckets:   []float64{100, 200, 300, 500, 750, 1000, 1500, 2000, 2500, 5000, 10000},
+		},
+		[]string{"method"},
 	)
 }
 
 // CollectPromStatics collect statics in prometheus
 func CollectPromStatics(uri string) error {
-	prometheus.MustRegister(clientConnGauge)
-	prometheus.MustRegister(apiInsGauge)
+	prometheus.MustRegister(streamConnGauge)
 	prometheus.MustRegister(requestCounter)
 	prometheus.MustRegister(requestErrCounter)
 	prometheus.MustRegister(responseDurHistogram)
