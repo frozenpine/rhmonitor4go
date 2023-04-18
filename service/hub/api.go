@@ -39,6 +39,7 @@ func frontToIdentity(f *service.RiskServer) string {
 type grpcRiskApi struct {
 	rhapi.AsyncRHMonitorApi
 
+	idt   string
 	ctx   context.Context
 	front *service.RiskServer
 	// broadcastSub    atomic.Bool
@@ -47,6 +48,33 @@ type grpcRiskApi struct {
 	broadcastBuffer []string
 
 	state apiState
+
+	clients sync.Map
+}
+
+func (api *grpcRiskApi) String() string {
+	return fmt.Sprintf(
+		"gRPCRhMonitorApi[%s] %s@%s:%d Connect[%v] Login[%v]",
+		api.idt, api.state.user.UserID,
+		api.front.ServerAddr, api.front.ServerPort,
+		api.state.connected.Load(), api.state.loggedIn.Load(),
+	)
+}
+
+func (api *grpcRiskApi) appendClient(c *client) *client {
+	if c != nil {
+		api.clients.Store(c.idt, c)
+	}
+
+	return c
+}
+
+func (api *grpcRiskApi) removeClient(c *client) *client {
+	if c != nil {
+		api.clients.Delete(c.idt)
+	}
+
+	return c
 }
 
 func (api *grpcRiskApi) sendBroadcast(msg string) {

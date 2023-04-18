@@ -34,13 +34,12 @@ var (
 type RiskHub struct {
 	service.UnimplementedRohonMonitorServer
 
-	ctx             context.Context
-	cancel          context.CancelFunc
-	svr             *grpc.Server
-	clientCache     sync.Map
-	apiCache        sync.Map
-	apiClientMapper sync.Map
-	apiReqTimeout   time.Duration
+	ctx           context.Context
+	cancel        context.CancelFunc
+	svr           *grpc.Server
+	clientCache   sync.Map
+	apiCache      sync.Map
+	apiReqTimeout time.Duration
 }
 
 func (hub *RiskHub) loadClient(idt string) (*client, error) {
@@ -104,9 +103,7 @@ func (hub *RiskHub) newClient(
 		api:  api,
 	})
 
-	hub.apiClientMapper.Store(frontToIdentity(api.front), ctx)
-
-	return c.(*client)
+	return api.appendClient(c.(*client))
 }
 
 func (hub *RiskHub) Init(ctx context.Context, req *service.Request) (result *service.Result, err error) {
@@ -123,6 +120,7 @@ func (hub *RiskHub) Init(ctx context.Context, req *service.Request) (result *ser
 	if api, err = hub.loadApiInstance(apiIdentity); err != nil {
 		if errors.Is(err, ErrRiskApiNotFound) {
 			api = &grpcRiskApi{
+				idt:             apiIdentity,
 				broadcastCh:     make(chan string, broadcastBufferSize),
 				broadcastBuffer: make([]string, 0, broadcastBufferSize),
 				ctx:             context.Background(),
@@ -160,9 +158,15 @@ func (hub *RiskHub) Init(ctx context.Context, req *service.Request) (result *ser
 }
 
 func (hub *RiskHub) Release(ctx context.Context, req *service.Request) (empty *emptypb.Empty, err error) {
-	if _, err = hub.loadAndDelClient(req.GetApiIdentity()); err != nil {
+	var c any
+
+	if c, err = hub.loadAndDelClient(req.GetApiIdentity()); err != nil {
 		log.Printf("Client not found: %+v", err)
 		return
+	} else {
+		client := c.(*client)
+
+		client.api.removeClient(client)
 	}
 
 	empty = &emptypb.Empty{}
@@ -201,6 +205,7 @@ func (hub *RiskHub) ReqUserLogin(ctx context.Context, req *service.Request) (res
 
 			log.Printf("Client login with api cache: %s", c)
 		} else {
+			c.api.removeClient(c)
 			err = errors.New("[grpc] Invalid username or password")
 		}
 	} else {
@@ -267,7 +272,12 @@ func (hub *RiskHub) ReqUserLogout(ctx context.Context, req *service.Request) (re
 		}
 
 		c.api.Release()
-		hub.loadAndDelApiInstance(frontToIdentity(c.api.front))
+		hub.loadAndDelApiInstance(c.api.idt)
+		c.api.clients.Range(func(clientIdt, client any) bool {
+			hub.clientCache.Delete(clientIdt)
+
+			return true
+		})
 
 		return nil
 	}).Finally(
@@ -395,7 +405,7 @@ func (hub *RiskHub) SubInvestorOrder(req *service.Request, stream service.RohonM
 	}
 
 	p := channel.NewMemoChannel[*rohon.Order](
-		c.api.ctx, frontToIdentity(c.api.front), 0,
+		c.api.ctx, c.api.idt, 0,
 	)
 
 	if c.api.state.orderFlow.CompareAndSwap(nil, p) {
@@ -460,7 +470,7 @@ func (hub *RiskHub) SubInvestorTrade(req *service.Request, stream service.RohonM
 	}
 
 	p := channel.NewMemoChannel[*rohon.Trade](
-		c.api.ctx, frontToIdentity(c.api.front), 0,
+		c.api.ctx, c.api.idt, 0,
 	)
 
 	if c.api.state.tradeFlow.CompareAndSwap(nil, p) {
@@ -525,7 +535,7 @@ func (hub *RiskHub) SubInvestorMoney(req *service.Request, stream service.RohonM
 	}
 
 	p := channel.NewMemoChannel[*rohon.Account](
-		c.api.ctx, frontToIdentity(c.api.front), 0,
+		c.api.ctx, c.api.idt, 0,
 	)
 
 	if c.api.state.accountFlow.CompareAndSwap(nil, p) {
@@ -601,7 +611,7 @@ func (hub *RiskHub) SubInvestorPosition(req *service.Request, stream service.Roh
 	}
 
 	p := channel.NewMemoChannel[*rohon.Position](
-		c.api.ctx, frontToIdentity(c.api.front), 0,
+		c.api.ctx, c.api.idt, 0,
 	)
 
 	if c.api.state.positionFlow.CompareAndSwap(nil, p) {
@@ -637,6 +647,7 @@ func (hub *RiskHub) SubInvestorPosition(req *service.Request, stream service.Roh
 		case <-stream.Context().Done():
 			log.Printf("Client[%s] disconnected.", c.idt)
 			err = posFlow.UnSubscribe(subID)
+			// hub.clientCache.Delete(c.idt)
 			return
 		case pos := <-ch:
 			if pos == nil {
