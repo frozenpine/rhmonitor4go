@@ -1,4 +1,4 @@
-package main
+package client
 
 import (
 	"context"
@@ -58,18 +58,42 @@ var (
 	ErrSameData = errors.New("same with old data")
 )
 
+type MsgFormat uint8
+
+func (msgFmt *MsgFormat) Set(value string) error {
+	switch value {
+	case "proto3":
+		*msgFmt = MsgProto3
+	case "json":
+		*msgFmt = MsgJson
+	case "msgpack":
+		*msgFmt = MsgPack
+	default:
+		return errors.New("invalid msg format")
+	}
+
+	return nil
+}
+
+//go:generate stringer -type MsgFormat -linecomment
+const (
+	MsgProto3 MsgFormat = iota // proto3
+	MsgJson                    // json
+	MsgPack                    // msgpack
+)
+
 type SinkAccount struct {
-	InvestorID string  `sql:"account_id"`
-	TradingDay string  `sql:"trading_day"`
-	Timestamp  int64   `sql:"timestamp"`
-	PreBalance float64 `sql:"pre_balance"`
-	Balance    float64 `sql:"balance"`
-	Deposit    float64 `sql:"deposit"`
-	Withdraw   float64 `sql:"withdraw"`
-	Profit     float64 `sql:"profit"`
-	Fee        float64 `sql:"fee"`
-	Margin     float64 `sql:"margin"`
-	Available  float64 `sql:"available"`
+	InvestorID string  `sql:"account_id" json:"account_id" msgpack:"account_id"`
+	TradingDay string  `sql:"trading_day" json:"trading_day" msgpack:"trading_day"`
+	Timestamp  int64   `sql:"timestamp" json:"timestamp" msgpack:"timestamp"`
+	PreBalance float64 `sql:"pre_balance" json:"pre_balance" msgpack:"pre_balance"`
+	Balance    float64 `sql:"balance" json:"balance" msgpack:"balance"`
+	Deposit    float64 `sql:"deposit" json:"deposit" msgpack:"deposit"`
+	Withdraw   float64 `sql:"withdraw" json:"withdraw" msgpack:"withdraw"`
+	Profit     float64 `sql:"profit" json:"profit" msgpack:"profit"`
+	Fee        float64 `sql:"fee" json:"fee" msgpack:"fee"`
+	Margin     float64 `sql:"margin" json:"margin" msgpack:"margin"`
+	Available  float64 `sql:"available" json:"available" msgpack:"available"`
 }
 
 func (acct *SinkAccount) FromAccount(value *service.Account) {
@@ -97,14 +121,14 @@ const (
 )
 
 type SinkAccountBar struct {
-	TradingDay string  `sql:"trading_day"`
-	AccountID  string  `sql:"account_id"`
-	Timestamp  int64   `sql:"timestamp"`
-	Duration   string  `sql:"duration"`
-	Open       float64 `sql:"open"`
-	Close      float64 `sql:"close"`
-	Highest    float64 `sql:"high"`
-	Lowest     float64 `sql:"low"`
+	TradingDay string  `sql:"trading_day" json:"trading_day" msgpack:"trading_day"`
+	AccountID  string  `sql:"account_id" json:"account_id" msgpack:"account_id"`
+	Timestamp  int64   `sql:"timestamp" json:"timestamp" msgpack:"timestamp"`
+	Duration   string  `sql:"duration" json:"duration" msgpack:"duration"`
+	Open       float64 `sql:"open" json:"open" msgpack:"open"`
+	Close      float64 `sql:"close" json:"close" msgpack:"close"`
+	Highest    float64 `sql:"high" json:"high" msgpack:"high"`
+	Lowest     float64 `sql:"low" json:"low" msgpack:"low"`
 }
 
 type AccountSinker struct {
@@ -114,15 +138,15 @@ type AccountSinker struct {
 
 	ctx         context.Context
 	source      service.RohonMonitor_SubInvestorMoneyClient
-	output      chan *service.Account
-	waterMark   *service.Account
+	output      chan *SinkAccount
+	waterMark   *SinkAccount
 	accountPool sync.Pool
 	barPool     sync.Pool
 
 	duration     time.Duration
 	settlements  map[string]*service.Account
 	tradingDay   string
-	accountCache map[string][]*service.Account
+	accountCache map[string][]*SinkAccount
 	barCache     map[string]*SinkAccountBar
 }
 
@@ -167,19 +191,17 @@ func NewAccountSinker(
 		acctSinker: acctSinker,
 		barSinker:  barSinker,
 		source:     src,
-		output:     make(chan *service.Account, 1),
-		waterMark: &service.Account{
+		output:     make(chan *SinkAccount, 1),
+		waterMark: &SinkAccount{
 			TradingDay: tradingDay,
-			Investor: &service.Investor{
-				InvestorId: "default",
-			},
+			InvestorID: "default",
 		},
 		duration:     dur,
 		accountPool:  sync.Pool{New: func() any { return new(SinkAccount) }},
 		barPool:      sync.Pool{New: func() any { return new(SinkAccountBar) }},
 		tradingDay:   tradingDay,
 		settlements:  settlements,
-		accountCache: make(map[string][]*service.Account),
+		accountCache: make(map[string][]*SinkAccount),
 		barCache:     make(map[string]*SinkAccountBar),
 	}
 
@@ -320,15 +342,15 @@ func (sink *AccountSinker) run() {
 
 			sink.accountCache[acct.Investor.InvestorId] = append(
 				sink.accountCache[acct.Investor.InvestorId],
-				acct,
+				sinkAccount,
 			)
 
-			sink.output <- acct
+			sink.output <- sinkAccount
 		}
 	}
 }
 
-func (sink *AccountSinker) Data() <-chan *service.Account {
+func (sink *AccountSinker) Data() <-chan *SinkAccount {
 	return sink.output
 }
 
@@ -336,7 +358,7 @@ var (
 	db *sql.DB
 )
 
-func initDB() (err error) {
+func InitDB(dbFile string) (err error) {
 	log.Print("Try to open db file:", dbFile)
 
 	if db, err = sql.Open("sqlite3", dbFile); err != nil {

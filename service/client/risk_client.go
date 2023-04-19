@@ -4,11 +4,18 @@ import (
 	"context"
 	"log"
 	"sync"
+	"sync/atomic"
 	"time"
 
+	"github.com/frozenpine/msgqueue/channel"
+	"github.com/frozenpine/msgqueue/core"
 	"github.com/frozenpine/rhmonitor4go/service"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
+)
+
+const (
+	defaultTimeout = time.Second * 10
 )
 
 type RHRiskClient struct {
@@ -23,12 +30,18 @@ type RHRiskClient struct {
 	riskSvr     *service.RiskServer
 	apiIdentity string
 	riskUser    *service.RiskUser
+
+	cmd          *channel.MemoChannel[*Cli]
+	orderFlow    atomic.Pointer[channel.MemoChannel[*service.Order]]
+	tradeFlow    atomic.Pointer[channel.MemoChannel[*service.Trade]]
+	accountFlow  atomic.Pointer[channel.MemoChannel[*service.Account]]
+	positionFlow atomic.Pointer[channel.MemoChannel[*service.Position]]
 }
 
 func NewRHRiskClient(
 	ctx context.Context,
 	conn *grpc.ClientConn,
-	timeout int,
+	timeout time.Duration,
 	riskSvr *service.RiskServer,
 	riskUser *service.RiskUser,
 ) (*RHRiskClient, error) {
@@ -44,28 +57,36 @@ func NewRHRiskClient(
 		ctx = context.Background()
 	}
 
-	client := &RHRiskClient{}
+	if timeout <= 0 {
+		timeout = defaultTimeout
+	}
 
+	client := &RHRiskClient{
+		conn:     conn,
+		instance: service.NewRohonMonitorClient(conn),
+		timeout:  timeout,
+		riskSvr:  riskSvr,
+		riskUser: riskUser,
+	}
 	client.ctx, client.cancel = context.WithCancel(ctx)
-	client.conn = conn
-	client.instance = service.NewRohonMonitorClient(conn)
-	client.timeout = time.Duration(timeout)
-
-	client.riskSvr = riskSvr
-	client.riskUser = riskUser
+	client.cmd = channel.NewMemoChannel[*Cli](client.ctx, "command", 0)
 
 	return client, nil
 }
 
-func (c *RHRiskClient) getTimeoutContext() (context.Context, context.CancelFunc) {
-	return context.WithTimeout(c.ctx, c.timeout)
+func (c *RHRiskClient) getTimeoutContext(timeout time.Duration) (context.Context, context.CancelFunc) {
+	if timeout <= 0 {
+		timeout = c.timeout
+	}
+
+	return context.WithTimeout(c.ctx, timeout)
 }
 
 func (c *RHRiskClient) Start() error {
 	err := errors.New("already started")
 
 	c.start.Do(func() {
-		deadline, cancel := c.getTimeoutContext()
+		deadline, cancel := c.getTimeoutContext(-1)
 
 		var result *service.Result
 
@@ -90,10 +111,15 @@ func (c *RHRiskClient) Start() error {
 }
 
 func (c *RHRiskClient) serve() {
+	sub, ch := c.cmd.Subscribe("serve", core.Quick)
+	defer c.cmd.UnSubscribe(sub)
+
 	for {
 		select {
 		case <-c.ctx.Done():
 			return
+		case cli := <-ch:
+			log.Print(cli)
 		}
 	}
 }
@@ -102,13 +128,20 @@ func (c *RHRiskClient) Stop() error {
 	err := errors.New("already stopped")
 
 	c.stop.Do(func() {
-		_, err = c.instance.Release(c.ctx, &service.Request{
+		defer c.cancel()
+
+		c.cmd.Release()
+
+		ctx, cancel := c.getTimeoutContext(-1)
+
+		if _, err = c.instance.Release(ctx, &service.Request{
 			ApiIdentity: c.apiIdentity,
-		})
+		}); err == nil {
+			err = nil
+		}
+		cancel()
 
-		c.cancel()
-
-		err = nil
+		err = c.conn.Close()
 	})
 
 	return err

@@ -17,8 +17,10 @@ import (
 	"time"
 
 	"github.com/frozenpine/rhmonitor4go/service"
+	"github.com/frozenpine/rhmonitor4go/service/client"
 	"github.com/go-redis/redis/v8"
 	"github.com/gogo/protobuf/proto"
+	"github.com/vmihailenco/msgpack/v5"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
@@ -39,33 +41,9 @@ var (
 	redisSvr        = "localhost:6379#1"
 	redisSvrPattern = regexp.MustCompile("(?:(.+)@)?([a-z0-9A-Z.:].+)#([0-9]+)")
 	redisChanBase   = "rohon.risk.accounts"
-	redisFormat     = MsgProto3
+	redisFormat     = client.MsgPack
 
 	barDuration = time.Minute
-)
-
-type MsgFormat uint8
-
-func (msgFmt *MsgFormat) Set(value string) error {
-	switch value {
-	case "proto3":
-		*msgFmt = MsgProto3
-	case "json":
-		*msgFmt = MsgJson
-	case "msgpack":
-		*msgFmt = MsgPack
-	default:
-		return errors.New("invalid msg format")
-	}
-
-	return nil
-}
-
-//go:generate stringer -type MsgFormat -linecomment
-const (
-	MsgProto3 MsgFormat = iota // proto3
-	MsgJson                    // json
-	MsgPack                    // msgpack
 )
 
 func init() {
@@ -94,7 +72,7 @@ func main() {
 		flag.Parse()
 	}
 
-	if err := initDB(); err != nil {
+	if err := client.InitDB(dbFile); err != nil {
 		log.Fatal("Init db failed:", err)
 	}
 
@@ -169,7 +147,7 @@ func main() {
 		DB:       redisDB,
 	})
 
-	client := service.NewRohonMonitorClient(conn)
+	remote := service.NewRohonMonitorClient(conn)
 
 	var (
 		result      *service.Result
@@ -180,7 +158,7 @@ func main() {
 
 	deadline, cancel = context.WithTimeout(ctx, time.Second*time.Duration(timeout))
 
-	if result, err = client.Init(deadline, &service.Request{
+	if result, err = remote.Init(deadline, &service.Request{
 		Request: &service.Request_Front{
 			Front: &service.RiskServer{
 				ServerAddr: riskSvrAddr,
@@ -196,7 +174,7 @@ func main() {
 	}
 	cancel()
 	defer func() {
-		if _, err = client.Release(ctx, &service.Request{
+		if _, err = remote.Release(ctx, &service.Request{
 			ApiIdentity: apiIdentity,
 		}); err != nil {
 			log.Fatalf("Release api failed: %+v", err)
@@ -204,7 +182,7 @@ func main() {
 	}()
 
 	var broadcast service.RohonMonitor_SubBroadcastClient
-	if broadcast, err = client.SubBroadcast(ctx, &service.Request{
+	if broadcast, err = remote.SubBroadcast(ctx, &service.Request{
 		ApiIdentity: apiIdentity,
 	}); err != nil {
 		log.Printf("Sub broadcast failed: %+v", err)
@@ -227,7 +205,7 @@ func main() {
 
 	deadline, cancel = context.WithTimeout(ctx, time.Second*time.Duration(timeout))
 
-	if result, err = client.ReqUserLogin(deadline, &service.Request{
+	if result, err = remote.ReqUserLogin(deadline, &service.Request{
 		ApiIdentity: apiIdentity,
 		Request: &service.Request_Login{
 			Login: &service.RiskUser{
@@ -244,7 +222,7 @@ func main() {
 
 	deadline, cancel = context.WithTimeout(ctx, time.Second*time.Duration(timeout))
 
-	if result, err = client.ReqQryMonitorAccounts(deadline, &service.Request{
+	if result, err = remote.ReqQryMonitorAccounts(deadline, &service.Request{
 		ApiIdentity: apiIdentity,
 		// Request: &service.Request_Investor{
 		// 	Investor: &service.Investor{InvestorId: ""},
@@ -261,7 +239,7 @@ func main() {
 	deadline, cancel = context.WithTimeout(ctx, time.Second*time.Duration(timeout))
 	settAccounts := make(map[string]*service.Account)
 
-	if result, err = client.ReqQryInvestorMoney(deadline, &service.Request{
+	if result, err = remote.ReqQryInvestorMoney(deadline, &service.Request{
 		ApiIdentity: apiIdentity,
 	}); err != nil {
 		log.Fatalf("Query investor's money failed: +%v", err)
@@ -273,7 +251,7 @@ func main() {
 	}
 	cancel()
 
-	stream, err := client.SubInvestorMoney(ctx, &service.Request{
+	stream, err := remote.SubInvestorMoney(ctx, &service.Request{
 		ApiIdentity: apiIdentity,
 	})
 	if err != nil {
@@ -286,13 +264,13 @@ func main() {
 		marshaller func(any) ([]byte, error)
 	)
 
-	sinker, err := NewAccountSinker(ctx, Continuous, barDuration, settAccounts, stream)
+	sinker, err := client.NewAccountSinker(ctx, client.Continuous, barDuration, settAccounts, stream)
 	if err != nil {
 		log.Fatalf("Create sinker failed: %+v", err)
 	}
 
 	switch redisFormat {
-	case MsgProto3:
+	case client.MsgProto3:
 		marshaller = func(value any) ([]byte, error) {
 			data, ok := value.(proto.Message)
 			if !ok {
@@ -301,8 +279,10 @@ func main() {
 
 			return proto.Marshal(data)
 		}
-	case MsgJson:
+	case client.MsgJson:
 		marshaller = json.Marshal
+	case client.MsgPack:
+		marshaller = msgpack.Marshal
 	default:
 		log.Fatal("Unsupported message format: ", redisFormat)
 	}
@@ -317,7 +297,7 @@ func main() {
 				continue
 			}
 
-			pubChan[1] = acct.Investor.InvestorId
+			pubChan[1] = acct.InvestorID
 			cmd := rdb.Publish(ctx, strings.Join(pubChan, "."), buffer)
 
 			if err = cmd.Err(); err != nil {
