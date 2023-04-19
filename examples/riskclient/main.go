@@ -115,13 +115,12 @@ func main() {
 		RootCAs:      caPool,
 	}
 
-	ctx := context.Background()
-	ctx, _ = signal.NotifyContext(ctx, os.Interrupt, os.Kill)
+	rootCtx, rootCancel := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill)
 
 	remoteAddr := fmt.Sprintf("%s:%d", rpcAddr, rpcPort)
 	log.Printf("Connecting to gRPC server: %s", remoteAddr)
 	conn, err := grpc.DialContext(
-		ctx, remoteAddr,
+		rootCtx, remoteAddr,
 		grpc.WithTransportCredentials(
 			credentials.NewTLS(tlsConfig),
 		),
@@ -156,7 +155,7 @@ func main() {
 		cancel      context.CancelFunc
 	)
 
-	deadline, cancel = context.WithTimeout(ctx, time.Second*time.Duration(timeout))
+	deadline, cancel = context.WithTimeout(rootCtx, time.Second*time.Duration(timeout))
 
 	if result, err = remote.Init(deadline, &service.Request{
 		Request: &service.Request_Front{
@@ -174,7 +173,7 @@ func main() {
 	}
 	cancel()
 	defer func() {
-		if _, err = remote.Release(ctx, &service.Request{
+		if _, err = remote.Release(rootCtx, &service.Request{
 			ApiIdentity: apiIdentity,
 		}); err != nil {
 			log.Fatalf("Release api failed: %+v", err)
@@ -182,7 +181,7 @@ func main() {
 	}()
 
 	var broadcast service.RohonMonitor_SubBroadcastClient
-	if broadcast, err = remote.SubBroadcast(ctx, &service.Request{
+	if broadcast, err = remote.SubBroadcast(rootCtx, &service.Request{
 		ApiIdentity: apiIdentity,
 	}); err != nil {
 		log.Printf("Sub broadcast failed: %+v", err)
@@ -190,11 +189,13 @@ func main() {
 		go func() {
 			for {
 				select {
-				case <-ctx.Done():
+				case <-rootCtx.Done():
 					return
 				default:
 					if msg, err := broadcast.Recv(); err != nil {
 						log.Printf("Receive broadcast failed: %+v", err)
+						rootCancel()
+						return
 					} else {
 						log.Printf("Broadcast received: %s", msg.Message)
 					}
@@ -203,7 +204,7 @@ func main() {
 		}()
 	}
 
-	deadline, cancel = context.WithTimeout(ctx, time.Second*time.Duration(timeout))
+	deadline, cancel = context.WithTimeout(rootCtx, time.Second*time.Duration(timeout))
 
 	if result, err = remote.ReqUserLogin(deadline, &service.Request{
 		ApiIdentity: apiIdentity,
@@ -220,13 +221,10 @@ func main() {
 	}
 	cancel()
 
-	deadline, cancel = context.WithTimeout(ctx, time.Second*time.Duration(timeout))
+	deadline, cancel = context.WithTimeout(rootCtx, time.Second*time.Duration(timeout))
 
 	if result, err = remote.ReqQryMonitorAccounts(deadline, &service.Request{
 		ApiIdentity: apiIdentity,
-		// Request: &service.Request_Investor{
-		// 	Investor: &service.Investor{InvestorId: ""},
-		// },
 	}); err != nil {
 		log.Fatalf("Query accounts failed: +%v", err)
 	} else {
@@ -236,11 +234,14 @@ func main() {
 	}
 	cancel()
 
-	deadline, cancel = context.WithTimeout(ctx, time.Second*time.Duration(timeout))
+	deadline, cancel = context.WithTimeout(rootCtx, time.Second*time.Duration(timeout))
 	settAccounts := make(map[string]*service.Account)
 
 	if result, err = remote.ReqQryInvestorMoney(deadline, &service.Request{
 		ApiIdentity: apiIdentity,
+		Request: &service.Request_Investor{
+			Investor: &service.Investor{InvestorId: "lmhx01"},
+		},
 	}); err != nil {
 		log.Fatalf("Query investor's money failed: +%v", err)
 	} else {
@@ -251,8 +252,11 @@ func main() {
 	}
 	cancel()
 
-	stream, err := remote.SubInvestorMoney(ctx, &service.Request{
+	stream, err := remote.SubInvestorMoney(rootCtx, &service.Request{
 		ApiIdentity: apiIdentity,
+		Request: &service.Request_Investor{
+			Investor: &service.Investor{InvestorId: "lmhx01"},
+		},
 	})
 	if err != nil {
 		log.Fatalf("Subscribe investor's account failed: %+v", err)
@@ -264,7 +268,7 @@ func main() {
 		marshaller func(any) ([]byte, error)
 	)
 
-	sinker, err := client.NewAccountSinker(ctx, client.Continuous, barDuration, settAccounts, stream)
+	sinker, err := client.NewAccountSinker(rootCtx, client.Continuous, barDuration, settAccounts, stream)
 	if err != nil {
 		log.Fatalf("Create sinker failed: %+v", err)
 	}
@@ -289,7 +293,7 @@ func main() {
 
 	for {
 		select {
-		case <-ctx.Done():
+		case <-rootCtx.Done():
 			return
 		case acct := <-sinker.Data():
 			if buffer, err = marshaller(acct); err != nil {
@@ -298,7 +302,7 @@ func main() {
 			}
 
 			pubChan[1] = acct.InvestorID
-			cmd := rdb.Publish(ctx, strings.Join(pubChan, "."), buffer)
+			cmd := rdb.Publish(rootCtx, strings.Join(pubChan, "."), buffer)
 
 			if err = cmd.Err(); err != nil {
 				log.Printf(
