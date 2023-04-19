@@ -240,34 +240,28 @@ func (sink *AccountSinker) boundary(ts time.Time) {
 		}
 
 		var (
-			open             = preBar.Close
-			high, low, close float64
+			open, high, low, close float64
+			count                  = len(accountList)
 		)
 
-		for _, v := range accountList {
-			if high == 0 {
-				high = v.Balance
-			} else if v.Balance > high {
-				high = v.Balance
-			}
-
-			if low == 0 {
-				low = v.Balance
-			} else if v.Balance < low {
-				low = v.Balance
-			}
+		if sink.mode == FirstTick && count > 0 {
+			open, high, low, close = accountList[0].Balance, accountList[0].Balance, accountList[0].Balance, accountList[0].Balance
+		} else {
+			open, high, low, close = preBar.Close, preBar.Close, preBar.Close, preBar.Close
 		}
 
-		count := len(accountList)
-
-		if count > 0 {
-			if sink.mode == FirstTick {
-				open = accountList[0].Balance
+		for idx, v := range accountList {
+			if v.Balance > high {
+				high = v.Balance
 			}
 
-			close = accountList[count-1].Balance
-		} else {
-			close, high, low = open, open, open
+			if v.Balance < low {
+				low = v.Balance
+			}
+
+			if idx == count-1 {
+				close = v.Balance
+			}
 		}
 
 		bar := sink.newSinkBar()
@@ -285,6 +279,7 @@ func (sink *AccountSinker) boundary(ts time.Time) {
 		}
 
 		sink.barCache[accountID] = bar
+		sink.accountCache[accountID] = []*SinkAccount{}
 	}
 
 	sink.output <- sink.waterMark
@@ -340,8 +335,8 @@ func (sink *AccountSinker) run() {
 				log.Print("Sink data failed:", err)
 			}
 
-			sink.accountCache[acct.Investor.InvestorId] = append(
-				sink.accountCache[acct.Investor.InvestorId],
+			sink.accountCache[sinkAccount.InvestorID] = append(
+				sink.accountCache[sinkAccount.InvestorID],
 				sinkAccount,
 			)
 
@@ -463,7 +458,7 @@ func InsertDB[T any](
 	return func(v *T) (sql.Result, error) {
 		values := getArgList(v)
 
-		log.Printf("Executing: %s, %s, %+v", sqlTpl, values, v)
+		// log.Printf("Executing: %s, %s, %+v", sqlTpl, values, v)
 
 		return db.ExecContext(ctx, sqlTpl, values...)
 	}, nil
