@@ -78,15 +78,15 @@ type RHMonitorApi struct {
 	investors *InvestorCache
 	// accounts  *AccountCache
 
-	requestID int64
+	requestID atomic.Int64
 }
 
 func (api *RHMonitorApi) nextRequestID(out *int64) int {
 	var old int64
 
 	for {
-		old = api.requestID
-		if atomic.CompareAndSwapInt64(&api.requestID, old, old+1) {
+		old = api.requestID.Load()
+		if api.requestID.CompareAndSwap(old, old+1) {
 			break
 		}
 	}
@@ -364,6 +364,7 @@ func (api *RHMonitorApi) HandleDisconnected() {
 	api.requests.SetInvestorReady(false)
 	api.requests.SetLogin(false)
 	api.requests.SetConnected(false)
+	api.requestID.Store(0)
 }
 
 func (api *RHMonitorApi) OnFrontDisconnected(reason rhmonitor4go.Reason) {
