@@ -25,6 +25,31 @@ import (
 	"google.golang.org/grpc/credentials"
 )
 
+type AccountList []string
+
+func (l *AccountList) Set(value string) error {
+	if value == "" {
+		l = nil
+		return nil
+	}
+
+	for _, v := range strings.Split(value, ",") {
+		d := strings.TrimSpace(v)
+
+		if d == "" {
+			continue
+		}
+
+		*l = append(([]string)(*l), d)
+	}
+
+	return nil
+}
+
+func (l AccountList) String() string {
+	return strings.Join(([]string)(l), ", ")
+}
+
 var (
 	rpcAddr    = ""
 	rpcPort    = 1234
@@ -44,6 +69,8 @@ var (
 	redisFormat     = client.MsgPack
 
 	barDuration = time.Minute
+
+	accounts AccountList
 )
 
 func init() {
@@ -63,6 +90,8 @@ func init() {
 	flag.StringVar(&redisSvr, "redis", redisSvr, "Redis server conn in format: ({pass}@)?{addr}:{port}#{db}")
 	flag.StringVar(&redisChanBase, "chan", redisChanBase, "Redis publish base channel")
 	flag.Var(&redisFormat, "format", "Redis message marshal format (default: proto3)")
+
+	flag.Var(&accounts, "accounts", "Account list for filting")
 
 	flag.DurationVar(&barDuration, "bar", barDuration, "Bar duration")
 }
@@ -241,9 +270,9 @@ func main() {
 
 	if result, err = remote.ReqQryInvestorMoney(deadline, &service.Request{
 		ApiIdentity: apiIdentity,
-		Request: &service.Request_Investor{
-			Investor: &service.Investor{InvestorId: "lmhx01"},
-		},
+		// Request: &service.Request_Investor{
+		// 	Investor: &service.Investor{InvestorId: "lmhx01"},
+		// },
 	}); err != nil {
 		log.Fatalf("Query investor's money failed: +%v", err)
 	} else {
@@ -256,9 +285,9 @@ func main() {
 
 	stream, err := remote.SubInvestorMoney(rootCtx, &service.Request{
 		ApiIdentity: apiIdentity,
-		Request: &service.Request_Investor{
-			Investor: &service.Investor{InvestorId: "lmhx01"},
-		},
+		// Request: &service.Request_Investor{
+		// 	Investor: &service.Investor{InvestorId: "lmhx01"},
+		// },
 	})
 	if err != nil {
 		log.Fatalf("Subscribe investor's account failed: %+v", err)
