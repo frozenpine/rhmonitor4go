@@ -2,6 +2,7 @@ package client_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -9,29 +10,50 @@ import (
 )
 
 func TestSink(t *testing.T) {
-	client.InitDB("trade.db")
+	// if err := client.InitDB("sqlite3://trade.db"); err != nil {
+	// 	t.Fatal(err)
+	// }
 
-	t.Log(time.Minute)
+	db, err := client.InitDB(
+		fmt.Sprintf(
+			"postgres://host=%s port=%d user=%s password=%s dbname=%s",
+			"localhost", 5432, "trade", "trade", "lingma",
+		),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
 
+	// sinker, err := client.InsertDB[client.SinkAccountBar](
+	// 	context.TODO(), "trade.operation_account_kbar",
+	// 	"TradingDay", "AccountID", "Timestamp", "Duration",
+	// 	"Open", "Close", "Highest", "Lowest",
+	// )
 	sinker, err := client.InsertDB[client.SinkAccountBar](
 		context.TODO(), "operation_account_kbar",
-		"TradingDay", "AccountID", "Timestamp", "Duration",
-		"Open", "Close", "Highest", "Lowest",
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err = sinker(&client.SinkAccountBar{
-		TradingDay: "2023-03-30",
+	now := time.Now()
+
+	if result, err := sinker(&client.SinkAccountBar{
+		TradingDay: now.Format("2006-01-02"),
 		AccountID:  "test",
-		Timestamp:  time.Now().Round(time.Second).UnixMilli(),
+		Timestamp:  now.Round(time.Millisecond),
 		Duration:   time.Second.String(),
-		Open:       1000,
-		Close:      1100,
-		Highest:    1300,
-		Lowest:     980,
+		Open:       float64(now.Hour()),
+		Close:      float64(now.UnixMilli()),
+		Highest:    float64(now.Minute()),
+		Lowest:     float64(now.Second()),
 	}); err != nil {
 		t.Fatal(err)
+	} else {
+		id, _ := result.LastInsertId()
+		count, _ := result.RowsAffected()
+
+		t.Logf("rowid: %d, insert count: %d", id, count)
 	}
 }

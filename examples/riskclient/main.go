@@ -33,7 +33,7 @@ var (
 	ca         = "ca.crt"
 	timeout    = 5
 
-	dbFile = "trade.db"
+	dbConn = "postgres://host=localhost port=5432 user=trade password=trade dbname=lingma"
 
 	riskSvr        = ""
 	riskSvrPattern = regexp.MustCompile("tcp://([a-zA-Z0-9]+)#(.+)@([0-9.]+):([0-9]+)")
@@ -58,7 +58,7 @@ func init() {
 
 	flag.StringVar(&riskSvr, "svr", riskSvr, "Rohon risk server conn in format: tcp://{user}#{pass}@{addr}:{port}")
 
-	flag.StringVar(&dbFile, "db", dbFile, "Database file")
+	flag.StringVar(&dbConn, "db", dbConn, "Database conn string")
 
 	flag.StringVar(&redisSvr, "redis", redisSvr, "Redis server conn in format: ({pass}@)?{addr}:{port}#{db}")
 	flag.StringVar(&redisChanBase, "chan", redisChanBase, "Redis publish base channel")
@@ -72,9 +72,11 @@ func main() {
 		flag.Parse()
 	}
 
-	if err := client.InitDB(dbFile); err != nil {
+	db, err := client.InitDB(dbConn)
+	if err != nil {
 		log.Fatal("Init db failed:", err)
 	}
+	defer db.Close()
 
 	match := riskSvrPattern.FindStringSubmatch(riskSvr)
 	if len(match) != 5 {

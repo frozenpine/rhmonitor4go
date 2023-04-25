@@ -7,12 +7,14 @@ import (
 	"fmt"
 	"log"
 	"reflect"
+	"regexp"
 	"runtime"
 	"strings"
 	"sync"
 	"time"
 	"unsafe"
 
+	_ "github.com/jackc/pgx/v5/stdlib"
 	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/frozenpine/rhmonitor4go/service"
@@ -56,6 +58,10 @@ PRIMARY KEY ("trading_day", "account_id", "timestamp")
 
 var (
 	ErrSameData = errors.New("same with old data")
+
+	driverMap = map[string]string{
+		"postgres": "pgx",
+	}
 )
 
 type MsgFormat uint8
@@ -83,23 +89,23 @@ const (
 )
 
 type SinkAccount struct {
-	InvestorID string  `sql:"account_id" json:"account_id" msgpack:"account_id"`
-	TradingDay string  `sql:"trading_day" json:"trading_day" msgpack:"trading_day"`
-	Timestamp  int64   `sql:"timestamp" json:"timestamp" msgpack:"timestamp"`
-	PreBalance float64 `sql:"pre_balance" json:"pre_balance" msgpack:"pre_balance"`
-	Balance    float64 `sql:"balance" json:"balance" msgpack:"balance"`
-	Deposit    float64 `sql:"deposit" json:"deposit" msgpack:"deposit"`
-	Withdraw   float64 `sql:"withdraw" json:"withdraw" msgpack:"withdraw"`
-	Profit     float64 `sql:"profit" json:"profit" msgpack:"profit"`
-	Fee        float64 `sql:"fee" json:"fee" msgpack:"fee"`
-	Margin     float64 `sql:"margin" json:"margin" msgpack:"margin"`
-	Available  float64 `sql:"available" json:"available" msgpack:"available"`
+	InvestorID string    `sql:"account_id" json:"account_id" msgpack:"account_id"`
+	TradingDay string    `sql:"trading_day" json:"trading_day" msgpack:"trading_day"`
+	Timestamp  time.Time `sql:"timestamp" json:"timestamp" msgpack:"timestamp"`
+	PreBalance float64   `sql:"pre_balance" json:"pre_balance" msgpack:"pre_balance"`
+	Balance    float64   `sql:"balance" json:"balance" msgpack:"balance"`
+	Deposit    float64   `sql:"deposit" json:"deposit" msgpack:"deposit"`
+	Withdraw   float64   `sql:"withdraw" json:"withdraw" msgpack:"withdraw"`
+	Profit     float64   `sql:"profit" json:"profit" msgpack:"profit"`
+	Fee        float64   `sql:"fee" json:"fee" msgpack:"fee"`
+	Margin     float64   `sql:"margin" json:"margin" msgpack:"margin"`
+	Available  float64   `sql:"available" json:"available" msgpack:"available"`
 }
 
 func (acct *SinkAccount) FromAccount(value *service.Account) {
 	acct.TradingDay = value.TradingDay
 	acct.InvestorID = value.Investor.InvestorId
-	acct.Timestamp = time.Now().UnixMilli()
+	acct.Timestamp = time.UnixMilli(value.Timestamp)
 	acct.PreBalance = value.PreBalance
 	acct.Deposit = value.Deposit
 	acct.Withdraw = value.Withdraw
@@ -121,14 +127,14 @@ const (
 )
 
 type SinkAccountBar struct {
-	TradingDay string  `sql:"trading_day" json:"trading_day" msgpack:"trading_day"`
-	AccountID  string  `sql:"account_id" json:"account_id" msgpack:"account_id"`
-	Timestamp  int64   `sql:"timestamp" json:"timestamp" msgpack:"timestamp"`
-	Duration   string  `sql:"duration" json:"duration" msgpack:"duration"`
-	Open       float64 `sql:"open" json:"open" msgpack:"open"`
-	Close      float64 `sql:"close" json:"close" msgpack:"close"`
-	Highest    float64 `sql:"high" json:"high" msgpack:"high"`
-	Lowest     float64 `sql:"low" json:"low" msgpack:"low"`
+	TradingDay string    `sql:"trading_day" json:"trading_day" msgpack:"trading_day"`
+	AccountID  string    `sql:"account_id" json:"account_id" msgpack:"account_id"`
+	Timestamp  time.Time `sql:"timestamp" json:"timestamp" msgpack:"timestamp"`
+	Duration   string    `sql:"duration" json:"duration" msgpack:"duration"`
+	Open       float64   `sql:"open" json:"open" msgpack:"open"`
+	Close      float64   `sql:"close" json:"close" msgpack:"close"`
+	Highest    float64   `sql:"high" json:"high" msgpack:"high"`
+	Lowest     float64   `sql:"low" json:"low" msgpack:"low"`
 }
 
 type AccountSinker struct {
@@ -223,7 +229,7 @@ func (sink *AccountSinker) newSinkBar() *SinkAccountBar {
 }
 
 func (sink *AccountSinker) boundary(ts time.Time) {
-	sink.waterMark.Timestamp = ts.UnixMilli()
+	sink.waterMark.Timestamp = ts
 
 	for accountID, settAccount := range sink.settlements {
 		accountList := sink.accountCache[accountID]
@@ -267,7 +273,7 @@ func (sink *AccountSinker) boundary(ts time.Time) {
 		bar := sink.newSinkBar()
 		bar.TradingDay = sink.tradingDay
 		bar.AccountID = accountID
-		bar.Timestamp = ts.Round(sink.duration).UnixMilli()
+		bar.Timestamp = ts.Round(sink.duration)
 		bar.Duration = sink.duration.String()
 		bar.Open = open
 		bar.Close = close
@@ -350,22 +356,46 @@ func (sink *AccountSinker) Data() <-chan *SinkAccount {
 }
 
 var (
-	db *sql.DB
+	db          *sql.DB
+	connPattern = regexp.MustCompile(
+		"(?P<proto>(?:sqlite3|postgres|pgx))://(?P<value>.+)",
+	)
 )
 
-func InitDB(dbFile string) (err error) {
-	log.Print("Try to open db file:", dbFile)
-
-	if db, err = sql.Open("sqlite3", dbFile); err != nil {
-		log.Fatal("Open database failed:", dbFile, err)
+func InitDB(conn string) (c *sql.DB, err error) {
+	matchs := connPattern.FindStringSubmatch(conn)
+	if len(matchs) < 1 {
+		return nil, errors.New("invalid db conn string")
 	}
 
-	if _, err = db.Exec(structuresSQL); err != nil {
+	protoIdx := connPattern.SubexpIndex("proto")
+	valueIdx := connPattern.SubexpIndex("value")
+
+	var (
+		proto string
+		exist bool
+	)
+
+	if proto, exist = driverMap[matchs[protoIdx]]; !exist {
+		proto = matchs[protoIdx]
+	}
+
+	log.Print("Try to open db: ", conn)
+
+	if c, err = sql.Open(proto, matchs[valueIdx]); err != nil {
+		log.Fatalf("Parse database[%s] failed: %+v", conn, err)
+	} else if err = c.Ping(); err != nil {
+		log.Fatalf("Open database[%s] failed: %+v", conn, err)
+	}
+
+	if _, err = c.Exec(structuresSQL); err != nil {
 		log.Fatalf(
 			"Create table failed: %s, %s\n%s",
-			dbFile, err, structuresSQL,
+			conn, err, structuresSQL,
 		)
 	}
+
+	db = c
 
 	return
 }
@@ -408,7 +438,7 @@ func InsertDB[T any](
 			})
 
 			sqlFields = append(sqlFields, sqlField)
-			argList = append(argList, "?")
+			argList = append(argList, fmt.Sprintf("$%d", i+1))
 		}
 	} else {
 		for idx, name := range argNames {
@@ -426,7 +456,7 @@ func InsertDB[T any](
 				}
 
 				sqlFields[idx] = sqlField
-				argList[idx] = "?"
+				argList[idx] = fmt.Sprintf("$%d", idx+1)
 			}
 		}
 	}
@@ -455,11 +485,23 @@ func InsertDB[T any](
 		return argList
 	}
 
+	// tx, err := db.Begin()
+
+	// insStmt, err := tx.Prepare(sqlTpl)
+	// if err != nil {
+	// 	log.Fatalf("Prepare sql \"%s\" failed: %+v", sqlTpl, err)
+	// }
+
 	return func(v *T) (sql.Result, error) {
 		values := getArgList(v)
+		// defer tx.Commit()
 
 		// log.Printf("Executing: %s, %s, %+v", sqlTpl, values, v)
 
-		return db.ExecContext(ctx, sqlTpl, values...)
+		c, cancel := context.WithCancel(ctx)
+		defer cancel()
+
+		return db.ExecContext(c, sqlTpl, values...)
+		// return insStmt.ExecContext(ctx, values...)
 	}, nil
 }
