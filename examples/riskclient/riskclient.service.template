@@ -1,0 +1,22 @@
+[Unit]
+Description=riskclient
+After=network.target
+
+[Service]
+Type=simple
+User=risk
+Group=risk
+WorkingDirectory={PATH_TO_EXEC}/riskclient
+ExecStart={PATH_TO_EXEC}/riskhub
+
+# systemctl --version newer than 240
+# StandardOutput=append:/var/log/riskclient/riskclient.log
+# StandardError=append:/var/log/riskclient/riskclient.err
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=riskclient
+
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

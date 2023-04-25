@@ -6,9 +6,9 @@ After=network.target
 Type=simple
 User=risk
 Group=risk
-WorkingDirectory=/home/risk/riskhub
+WorkingDirectory={PATH_TO_EXEC}/riskhub
 Environment=LD_LIBRARY_PATH=.
-ExecStart=/home/risk/riskhub/riskhub
+ExecStart={PATH_TO_EXEC}/riskhub
 
 # systemctl --version newer than 240
 # StandardOutput=append:/var/log/riskhub/riskhub.log
