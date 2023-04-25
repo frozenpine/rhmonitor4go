@@ -20,6 +20,9 @@ var (
 	svrKey  = "riskhub.key"
 	ca      = "ca.crt"
 	debug   = false
+
+	version, goVersion, gitVersion, buildTime string
+	showVersion                               = false
 )
 
 func init() {
@@ -31,11 +34,21 @@ func init() {
 	flag.StringVar(&svrKey, "key", svrKey, "gRPC server cert key path")
 	flag.StringVar(&ca, "ca", ca, "gRPC server cert CA path")
 	flag.BoolVar(&debug, "verbose", debug, "gRPC server debug switch")
+
+	flag.BoolVar(&showVersion, "version", showVersion, "Show version")
 }
 
 func main() {
 	if !flag.Parsed() {
 		flag.Parse()
+	}
+
+	if showVersion {
+		fmt.Printf(
+			"Version: %s, Commit: %s, Build: %s @ %s\n",
+			version, gitVersion, buildTime, goVersion,
+		)
+		os.Exit(0)
 	}
 
 	listenAddr := fmt.Sprintf("%s:%d", rpcAddr, rpcPort)

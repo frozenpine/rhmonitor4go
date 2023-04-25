@@ -71,6 +71,9 @@ var (
 	barDuration = time.Minute
 
 	accounts AccountList
+
+	version, goVersion, gitVersion, buildTime string
+	showVersion                               = false
 )
 
 func init() {
@@ -99,6 +102,14 @@ func init() {
 func main() {
 	if !flag.Parsed() {
 		flag.Parse()
+	}
+
+	if showVersion {
+		fmt.Printf(
+			"Version: %s, Commit: %s, Build: %s @ %s\n",
+			version, gitVersion, buildTime, goVersion,
+		)
+		os.Exit(0)
 	}
 
 	db, err := client.InitDB(dbConn)
