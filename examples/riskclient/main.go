@@ -97,6 +97,7 @@ func init() {
 	flag.Var(&accounts, "accounts", "Account list for filting")
 
 	flag.DurationVar(&barDuration, "bar", barDuration, "Bar duration")
+	flag.BoolVar(&showVersion, "version", showVersion, "Show version")
 }
 
 func main() {
