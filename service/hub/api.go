@@ -132,7 +132,7 @@ func (api *grpcRiskApi) OnRspUserLogin(
 	info *rohon.RspInfo,
 	reqID int64,
 ) {
-	if info.ErrorID == 0 {
+	if info == nil || info.ErrorID == 0 {
 		api.state.loggedIn.Store(true)
 		api.state.rspLogin = *login
 	}
