@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/frozenpine/rhmonitor4go/service/client"
+	"github.com/vmihailenco/msgpack/v5"
 )
 
 func TestSink(t *testing.T) {
@@ -56,4 +57,42 @@ func TestSink(t *testing.T) {
 
 		t.Logf("rowid: %d, insert count: %d", id, count)
 	}
+}
+
+func TestMarshal(t *testing.T) {
+	now := time.Now()
+
+	acct := client.SinkAccount{
+		InvestorID: "test",
+		TradingDay: now.Format("2006-01-02"),
+		Timestamp:  now,
+		PreBalance: 10000,
+		Balance:    10000,
+		Deposit:    0,
+		Withdraw:   0,
+		Profit:     0,
+		Fee:        0,
+		Margin:     0,
+		Available:  10000,
+	}
+
+	buffer, err := msgpack.Marshal(acct)
+	if err != nil {
+		t.Fatal(err)
+	} else {
+		t.Log(buffer)
+	}
+
+	v := client.SinkAccount{}
+	if err = msgpack.Unmarshal(buffer, &v); err != nil {
+		t.Fatal(err)
+	}
+	t.Log(v)
+
+	payload := "\x8b\xaaaccount_id\xa7default\xabtrading_day\xa820230426\xa9timestamp\xd7\xff\x02\x83\xb0`dH\xb3\x90\xabpre_balance\xcb\x00\x00\x00\x00\x00\x00\x00\x00\xa7balance\xcb\x00\x00\x00\x00\x00\x00\x00\x00\xa7deposit\xcb\x00\x00\x00\x00\x00\x00\x00\x00\xa8withdraw\xcb\x00\x00\x00\x00\x00\x00\x00\x00\xa6profit\xcb\x00\x00\x00\x00\x00\x00\x00\x00\xa3fee\xcb\x00\x00\x00\x00\x00\x00\x00\x00\xa6margin\xcb\x00\x00\x00\x00\x00\x00\x00\x00\xa9available\xcb\x00\x00\x00\x00\x00\x00\x00\x00"
+
+	if err = msgpack.Unmarshal([]byte(payload), &v); err != nil {
+		t.Fatal(err)
+	}
+	t.Log(v)
 }

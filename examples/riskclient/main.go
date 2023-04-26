@@ -92,7 +92,7 @@ func init() {
 
 	flag.StringVar(&redisSvr, "redis", redisSvr, "Redis server conn in format: ({pass}@)?{addr}:{port}#{db}")
 	flag.StringVar(&redisChanBase, "chan", redisChanBase, "Redis publish base channel")
-	flag.Var(&redisFormat, "format", "Redis message marshal format (default: proto3)")
+	flag.Var(&redisFormat, "format", "Redis message marshal format (default: msgpack)")
 
 	flag.Var(&accounts, "accounts", "Account list for filting")
 
