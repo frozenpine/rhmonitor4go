@@ -96,3 +96,16 @@ func TestMarshal(t *testing.T) {
 	}
 	t.Log(v)
 }
+
+func TestDuration(t *testing.T) {
+	multiple := []int{1, 5, 24, 30}
+
+	for _, dur := range []time.Duration{time.Minute, time.Hour} {
+		for _, v := range multiple {
+			t.Log(time.Duration(v) * dur)
+		}
+	}
+
+	t.Log(time.ParseDuration("24h"))
+	t.Log(time.Hour * 24)
+}

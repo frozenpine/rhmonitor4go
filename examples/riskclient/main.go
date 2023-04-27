@@ -14,6 +14,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/frozenpine/rhmonitor4go/service"
@@ -98,6 +99,81 @@ func init() {
 
 	flag.DurationVar(&barDuration, "bar", barDuration, "Bar duration")
 	flag.BoolVar(&showVersion, "version", showVersion, "Show version")
+}
+
+func reconnectedHandler(
+	ctx context.Context, cancel context.CancelFunc,
+	remote service.RohonMonitorClient, identity string,
+	broadcast service.RohonMonitor_SubBroadcastClient,
+	sinker *atomic.Pointer[client.AccountSinker],
+) {
+	if ctx == nil {
+		log.Fatal("Invalid context for reconnect handler")
+	}
+
+	disconnected := false
+	frontMsgPattern := regexp.MustCompile(`Front\[(?P<host>.+)\] (?P<state>(?:[Dd]is)?[Cc]onnected).*`)
+	hostIdx := frontMsgPattern.SubexpIndex("host")
+	stateIdx := frontMsgPattern.SubexpIndex("state")
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			msg, err := broadcast.Recv()
+
+			if err != nil {
+				log.Printf("Receive broadcast failed: %+v", err)
+				cancel()
+				return
+			}
+
+			log.Printf("Broadcast received: %s", msg.Message)
+
+			match := frontMsgPattern.FindStringSubmatch(msg.GetMessage())
+
+			if len(match) == 0 {
+				continue
+			}
+
+			host := match[hostIdx]
+			state := match[stateIdx]
+
+			switch state {
+			case "connected":
+				fallthrough
+			case "Connected":
+				if sinker := sinker.Load(); disconnected && sinker != nil {
+					deadline, cancel := context.WithTimeout(ctx, time.Second*time.Duration(timeout))
+					defer cancel()
+
+					log.Print("Risk reconnected, re-query investor's money")
+					if result, err := remote.ReqQryInvestorMoney(deadline, &service.Request{
+						ApiIdentity: identity,
+						// Request: &service.Request_Investor{
+						// 	Investor: &service.Investor{InvestorId: "lmhx01"},
+						// },
+					}); err != nil {
+						log.Fatalf("Reconnected[%s] query investor's money failed: +%v", host, err)
+					} else {
+						for _, acct := range result.GetAccounts().GetData() {
+							if err := sinker.RenewSettle(acct); err != nil {
+								log.Fatalf("Renew account settlement failed: %+v", err)
+							}
+						}
+					}
+				}
+				disconnected = false
+			case "disconnected":
+				fallthrough
+			case "Disconnected":
+				fallthrough
+			case "DisConnected":
+				disconnected = true
+			}
+		}
+	}
 }
 
 func main() {
@@ -223,28 +299,19 @@ func main() {
 		}
 	}()
 
-	var broadcast service.RohonMonitor_SubBroadcastClient
-	if broadcast, err = remote.SubBroadcast(rootCtx, &service.Request{
+	var (
+		sinkerPointer atomic.Pointer[client.AccountSinker]
+	)
+	if broadcast, err := remote.SubBroadcast(rootCtx, &service.Request{
 		ApiIdentity: apiIdentity,
 	}); err != nil {
 		log.Printf("Sub broadcast failed: %+v", err)
 	} else {
-		go func() {
-			for {
-				select {
-				case <-rootCtx.Done():
-					return
-				default:
-					if msg, err := broadcast.Recv(); err != nil {
-						log.Printf("Receive broadcast failed: %+v", err)
-						rootCancel()
-						return
-					} else {
-						log.Printf("Broadcast received: %s", msg.Message)
-					}
-				}
-			}
-		}()
+		go reconnectedHandler(
+			rootCtx, rootCancel,
+			remote, apiIdentity,
+			broadcast, &sinkerPointer,
+		)
 	}
 
 	deadline, cancel = context.WithTimeout(rootCtx, time.Second*time.Duration(timeout))
@@ -278,7 +345,8 @@ func main() {
 	cancel()
 
 	deadline, cancel = context.WithTimeout(rootCtx, time.Second*time.Duration(timeout))
-	settAccounts := make(map[string]*service.Account)
+
+	var settleAccounts []*service.Account
 
 	if result, err = remote.ReqQryInvestorMoney(deadline, &service.Request{
 		ApiIdentity: apiIdentity,
@@ -288,10 +356,7 @@ func main() {
 	}); err != nil {
 		log.Fatalf("Query investor's money failed: +%v", err)
 	} else {
-		for _, acct := range result.GetAccounts().GetData() {
-			settAccounts[acct.Investor.InvestorId] = acct
-			fmt.Printf("Queried account: %+v\n", acct)
-		}
+		settleAccounts = result.GetAccounts().GetData()
 	}
 	cancel()
 
@@ -311,10 +376,11 @@ func main() {
 		marshaller func(any) ([]byte, error)
 	)
 
-	sinker, err := client.NewAccountSinker(rootCtx, client.Continuous, barDuration, settAccounts, stream)
+	sinker, err := client.NewAccountSinker(rootCtx, client.Continuous, barDuration, settleAccounts, stream)
 	if err != nil {
 		log.Fatalf("Create sinker failed: %+v", err)
 	}
+	sinkerPointer.Store(sinker)
 
 	switch redisFormat {
 	case client.MsgProto3:
