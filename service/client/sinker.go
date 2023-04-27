@@ -158,6 +158,7 @@ func (sink *AccountSinker) newSinkBar() *SinkAccountBar {
 func (sink *AccountSinker) boundary(ts time.Time) {
 	if !sink.boundaryFlag.Load() {
 		log.Print("No account stream input, stop bar boundary")
+		return
 	}
 
 	sink.waterMark.Timestamp = ts
