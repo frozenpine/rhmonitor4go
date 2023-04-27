@@ -404,13 +404,13 @@ func main() {
 		select {
 		case <-rootCtx.Done():
 			return
-		case acct := <-sinker.Data():
-			if buffer, err = marshaller(acct); err != nil {
+		case bar := <-sinker.Data():
+			if buffer, err = marshaller(bar); err != nil {
 				log.Printf("Marshal account message failed: %s", err)
 				continue
 			}
 
-			pubChan[1] = acct.AccountID
+			pubChan[1] = bar.AccountID
 			cmd := rdb.Publish(rootCtx, strings.Join(pubChan, "."), buffer)
 
 			if err = cmd.Err(); err != nil {
