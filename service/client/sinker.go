@@ -286,7 +286,13 @@ func (sink *AccountSinker) run() {
 
 				currBar = sink.newSinkBar()
 				currBar.TradingDay = sinkAccount.TradingDay
-				currBar.Timestamp = preBar.Timestamp.Add(time.Minute)
+				ts := preBar.Timestamp.Add(sink.duration)
+				if sinkAccount.Timestamp.After(ts) {
+					if ts = sinkAccount.Timestamp.Round(sink.duration); sinkAccount.Timestamp.After(ts) {
+						ts = ts.Add(sink.duration)
+					}
+				}
+				currBar.Timestamp = ts
 				currBar.AccountID = sinkAccount.InvestorID
 				currBar.Duration = sink.duration.String()
 
