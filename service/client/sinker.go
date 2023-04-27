@@ -57,85 +57,10 @@ PRIMARY KEY ("trading_day", "account_id", "timestamp")
 )
 
 var (
-	ErrSameData = errors.New("same with old data")
-
 	driverMap = map[string]string{
 		"postgres": "pgx",
 	}
 )
-
-type MsgFormat uint8
-
-func (msgFmt *MsgFormat) Set(value string) error {
-	switch value {
-	case "proto3":
-		*msgFmt = MsgProto3
-	case "json":
-		*msgFmt = MsgJson
-	case "msgpack":
-		*msgFmt = MsgPack
-	default:
-		return errors.New("invalid msg format")
-	}
-
-	return nil
-}
-
-//go:generate stringer -type MsgFormat -linecomment
-const (
-	MsgProto3 MsgFormat = iota // proto3
-	MsgJson                    // json
-	MsgPack                    // msgpack
-)
-
-type SinkAccount struct {
-	InvestorID string    `sql:"account_id" json:"account_id" msgpack:"account_id"`
-	TradingDay string    `sql:"trading_day" json:"trading_day" msgpack:"trading_day"`
-	Timestamp  time.Time `sql:"timestamp" json:"timestamp" msgpack:"timestamp"`
-	PreBalance float64   `sql:"pre_balance" json:"pre_balance" msgpack:"pre_balance"`
-	Balance    float64   `sql:"balance" json:"balance" msgpack:"balance"`
-	Deposit    float64   `sql:"deposit" json:"deposit" msgpack:"deposit"`
-	Withdraw   float64   `sql:"withdraw" json:"withdraw" msgpack:"withdraw"`
-	Profit     float64   `sql:"profit" json:"profit" msgpack:"profit"`
-	Fee        float64   `sql:"fee" json:"fee" msgpack:"fee"`
-	Margin     float64   `sql:"margin" json:"margin" msgpack:"margin"`
-	Available  float64   `sql:"available" json:"available" msgpack:"available"`
-}
-
-func (acct *SinkAccount) FromAccount(value *service.Account) {
-	acct.TradingDay = value.TradingDay
-	acct.InvestorID = value.Investor.InvestorId
-	acct.Timestamp = time.UnixMilli(value.Timestamp)
-	acct.PreBalance = value.PreBalance
-	acct.Deposit = value.Deposit
-	acct.Withdraw = value.Withdraw
-	acct.Profit = value.CloseProfit + value.PositionProfit
-	acct.Fee = value.Commission + value.FrozenCommission
-	acct.Margin = value.CurrentMargin + value.FrozenMargin
-	acct.Available = value.Available
-	acct.Balance = service.RohonCaculateDynamicBalance(
-		value.PreBalance, value.Deposit, value.Withdraw,
-		value.CloseProfit, value.PositionProfit, value.Commission,
-	)
-}
-
-type BarMode uint8
-
-const (
-	Continuous BarMode = 1 << iota
-	FirstTick
-)
-
-type SinkAccountBar struct {
-	TradingDay string    `sql:"trading_day" json:"trading_day" msgpack:"trading_day"`
-	AccountID  string    `sql:"account_id" json:"account_id" msgpack:"account_id"`
-	Timestamp  time.Time `sql:"timestamp" json:"timestamp" msgpack:"timestamp"`
-	Duration   string    `sql:"duration" json:"duration" msgpack:"duration"`
-	Open       float64   `sql:"open" json:"open" msgpack:"open"`
-	Close      float64   `sql:"close" json:"close" msgpack:"close"`
-	Highest    float64   `sql:"high" json:"high" msgpack:"high"`
-	Lowest     float64   `sql:"low" json:"low" msgpack:"low"`
-}
 
 type AccountSinker struct {
 	mode       BarMode
@@ -150,27 +75,26 @@ type AccountSinker struct {
 	barPool     sync.Pool
 
 	duration     time.Duration
-	settlements  map[string]*service.Account
-	tradingDay   string
+	settlements  sync.Map
 	accountCache map[string][]*SinkAccount
-	barCache     map[string]*SinkAccountBar
+	barCache     sync.Map
 }
 
 func NewAccountSinker(
 	ctx context.Context,
 	mode BarMode, dur time.Duration,
-	settlements map[string]*service.Account,
+	settlements []*service.Account,
 	src service.RohonMonitor_SubInvestorMoneyClient,
 ) (*AccountSinker, error) {
-	if src == nil || settlements == nil {
+	if src == nil || settlements == nil || len(settlements) == 0 {
 		return nil, errors.New("invalid sinker args")
 	}
 
 	acctSinker, err := InsertDB[SinkAccount](
 		ctx, "operation_trading_account",
-		"TradingDay", "InvestorID", "Timestamp", "PreBalance",
-		"Balance", "Deposit", "Withdraw", "Profit", "Fee",
-		"Margin", "Available",
+		// "TradingDay", "InvestorID", "Timestamp", "PreBalance",
+		// "Balance", "Deposit", "Withdraw", "Profit", "Fee",
+		// "Margin", "Available",
 	)
 	if err != nil {
 		return nil, err
@@ -178,17 +102,11 @@ func NewAccountSinker(
 
 	barSinker, err := InsertDB[SinkAccountBar](
 		ctx, "operation_account_kbar",
-		"TradingDay", "AccountID", "Timestamp", "Duration",
-		"Open", "Close", "Highest", "Lowest",
+		// "TradingDay", "AccountID", "Timestamp", "Duration",
+		// "Open", "Close", "Highest", "Lowest",
 	)
 	if err != nil {
 		return nil, err
-	}
-
-	tradingDay := ""
-	for _, v := range settlements {
-		tradingDay = v.GetTradingDay()
-		break
 	}
 
 	sinker := &AccountSinker{
@@ -199,16 +117,23 @@ func NewAccountSinker(
 		source:     src,
 		output:     make(chan *SinkAccount, 1),
 		waterMark: &SinkAccount{
-			TradingDay: tradingDay,
 			InvestorID: "default",
 		},
 		duration:     dur,
 		accountPool:  sync.Pool{New: func() any { return new(SinkAccount) }},
 		barPool:      sync.Pool{New: func() any { return new(SinkAccountBar) }},
-		tradingDay:   tradingDay,
-		settlements:  settlements,
 		accountCache: make(map[string][]*SinkAccount),
-		barCache:     make(map[string]*SinkAccountBar),
+	}
+
+	for _, settle := range settlements {
+		investor := settle.GetInvestor()
+
+		if investor == nil {
+			log.Printf("Investor info not found in settle: %+v", settle)
+			continue
+		}
+
+		sinker.settlements.Store(investor.InvestorId, settle)
 	}
 
 	go sinker.run()
@@ -231,19 +156,19 @@ func (sink *AccountSinker) newSinkBar() *SinkAccountBar {
 func (sink *AccountSinker) boundary(ts time.Time) {
 	sink.waterMark.Timestamp = ts
 
-	for accountID, settAccount := range sink.settlements {
+	sink.settlements.Range(func(key, value any) bool {
+		accountID := key.(string)
+		settAccount := value.(*service.Account)
+
 		accountList := sink.accountCache[accountID]
 
-		preBar := sink.barCache[accountID]
+		pre, _ := sink.barCache.LoadOrStore(accountID, &SinkAccountBar{
+			AccountID:  accountID,
+			TradingDay: settAccount.TradingDay,
+			Close:      settAccount.PreBalance,
+		})
 
-		if preBar == nil {
-			preBar = &SinkAccountBar{
-				AccountID:  accountID,
-				TradingDay: sink.tradingDay,
-				Close:      settAccount.PreBalance,
-			}
-			sink.barCache[accountID] = preBar
-		}
+		preBar := pre.(*SinkAccountBar)
 
 		var (
 			open, high, low, close float64
@@ -271,7 +196,7 @@ func (sink *AccountSinker) boundary(ts time.Time) {
 		}
 
 		bar := sink.newSinkBar()
-		bar.TradingDay = sink.tradingDay
+		bar.TradingDay = settAccount.TradingDay
 		bar.AccountID = accountID
 		bar.Timestamp = ts.Round(sink.duration)
 		bar.Duration = sink.duration.String()
@@ -284,9 +209,11 @@ func (sink *AccountSinker) boundary(ts time.Time) {
 			log.Printf("Sink account bar failed: %+v", err)
 		}
 
-		sink.barCache[accountID] = bar
+		sink.barCache.Store(accountID, bar)
 		sink.accountCache[accountID] = []*SinkAccount{}
-	}
+
+		return true
+	})
 
 	sink.output <- sink.waterMark
 }
@@ -353,6 +280,27 @@ func (sink *AccountSinker) run() {
 
 func (sink *AccountSinker) Data() <-chan *SinkAccount {
 	return sink.output
+}
+
+func (sink *AccountSinker) RenewSettle(acct *service.Account) error {
+	if acct == nil {
+		return errors.New("invalid settlement account")
+	}
+
+	investor := acct.GetInvestor()
+	if investor == nil {
+		return errors.New("no investor info found")
+	}
+
+	pre, exist := sink.settlements.Swap(investor.InvestorId, acct)
+	if exist {
+		if preAcct := pre.(*service.Account); preAcct.TradingDay != acct.TradingDay {
+			// 换日，强制boundary时生成新交易日的preBar
+			sink.barCache.Delete(investor.InvestorId)
+		}
+	}
+
+	return nil
 }
 
 var (
