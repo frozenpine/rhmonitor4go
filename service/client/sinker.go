@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unsafe"
 
@@ -77,6 +78,7 @@ type AccountSinker struct {
 	duration     time.Duration
 	settlements  sync.Map
 	accountCache map[string][]*SinkAccount
+	boundaryFlag atomic.Bool
 	barCache     sync.Map
 }
 
@@ -154,6 +156,10 @@ func (sink *AccountSinker) newSinkBar() *SinkAccountBar {
 }
 
 func (sink *AccountSinker) boundary(ts time.Time) {
+	if !sink.boundaryFlag.Load() {
+		log.Print("No account stream input, stop bar boundary")
+	}
+
 	sink.waterMark.Timestamp = ts
 
 	sink.settlements.Range(func(key, value any) bool {
@@ -245,6 +251,7 @@ func (sink *AccountSinker) run() {
 
 	timer := time.NewTimer(nextTs.Sub(now))
 	ticker := time.NewTicker(sink.duration)
+	streamTimeout := time.NewTimer(time.Second * 2)
 
 	ticker.Stop()
 
@@ -260,7 +267,13 @@ func (sink *AccountSinker) run() {
 			sink.boundary(ts)
 		case ts := <-ticker.C:
 			sink.boundary(ts)
+		case <-streamTimeout.C:
+			sink.boundaryFlag.Store(false)
 		case acct := <-inputChan:
+			sink.boundaryFlag.Store(true)
+			streamTimeout.Stop()
+			streamTimeout.Reset(time.Second * 2)
+
 			sinkAccount := sink.newSinkAccount()
 			sinkAccount.FromAccount(acct)
 
