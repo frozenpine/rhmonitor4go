@@ -410,7 +410,7 @@ func main() {
 				continue
 			}
 
-			pubChan[1] = acct.InvestorID
+			pubChan[1] = acct.AccountID
 			cmd := rdb.Publish(rootCtx, strings.Join(pubChan, "."), buffer)
 
 			if err = cmd.Err(); err != nil {
