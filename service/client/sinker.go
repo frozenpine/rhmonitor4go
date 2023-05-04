@@ -259,7 +259,7 @@ func (sink *AccountSinker) run() {
 
 				if sett, exist := sink.settlements.Load(sinkAccount.InvestorID); exist {
 					// 昨结算账户存在
-					price = sett.(*SinkAccount).PreBalance
+					price = sett.(*service.Account).PreBalance
 				} else {
 					// 昨结算账户不存在，可能为实时上场新增账户，以账户 昨结算 + 入金 - 出金 作为初始资金
 					price = sinkAccount.PreBalance + sinkAccount.Deposit - sinkAccount.Withdraw
