@@ -119,6 +119,7 @@ func NewAccountSinker(
 		duration:    dur,
 		accountPool: sync.Pool{New: func() any { return new(SinkAccount) }},
 		barPool:     sync.Pool{New: func() any { return new(SinkAccountBar) }},
+		barCache:    make(map[string]*SinkAccountBar),
 	}
 
 	for _, settle := range settlements {
