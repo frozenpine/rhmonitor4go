@@ -78,6 +78,7 @@ type AccountSinker struct {
 	settlements  sync.Map
 	boundaryFlag atomic.Bool
 	barCache     map[string]*SinkAccountBar
+	accountCache map[string]*SinkAccount
 }
 
 func NewAccountSinker(
@@ -110,16 +111,17 @@ func NewAccountSinker(
 	}
 
 	sinker := &AccountSinker{
-		ctx:         ctx,
-		mode:        mode,
-		acctSinker:  acctSinker,
-		barSinker:   barSinker,
-		source:      src,
-		output:      make(chan *SinkAccountBar, 1),
-		duration:    dur,
-		accountPool: sync.Pool{New: func() any { return new(SinkAccount) }},
-		barPool:     sync.Pool{New: func() any { return new(SinkAccountBar) }},
-		barCache:    make(map[string]*SinkAccountBar),
+		ctx:          ctx,
+		mode:         mode,
+		acctSinker:   acctSinker,
+		barSinker:    barSinker,
+		source:       src,
+		output:       make(chan *SinkAccountBar, 1),
+		duration:     dur,
+		accountPool:  sync.Pool{New: func() any { return new(SinkAccount) }},
+		barPool:      sync.Pool{New: func() any { return new(SinkAccountBar) }},
+		barCache:     make(map[string]*SinkAccountBar),
+		accountCache: make(map[string]*SinkAccount),
 	}
 
 	for _, settle := range settlements {
@@ -177,13 +179,18 @@ func (sink *AccountSinker) boundary(ts time.Time) {
 			sink.barCache[accountID] = currBar
 		} else if currBar.Timestamp.After(boundaryTs) {
 			// 已由实时流触发更新bar数据
+			log.Printf("Bar[%s] @ %s updated by stream", accountID, boundaryTs)
 			return true
 		}
 
 		currBar.Timestamp = boundaryTs
-		currBar.Highest = currBar.Open
-		currBar.Lowest = currBar.Open
-		currBar.Close = currBar.Open
+		// 实时资金流更新已停止
+		if acct, exist := sink.accountCache[accountID]; !exist ||
+			acct.Timestamp.Compare(boundaryTs.Add(-sink.duration)) <= 0 {
+			currBar.Highest = currBar.Open
+			currBar.Lowest = currBar.Open
+			currBar.Close = currBar.Open
+		}
 
 		if _, err := sink.barSinker(currBar); err != nil {
 			log.Printf("Sink account bar failed: %+v", err)
@@ -219,10 +226,12 @@ func (sink *AccountSinker) run() {
 	if nextTs.Before(now) {
 		nextTs = nextTs.Add(sink.duration)
 	}
+	// 人为引入延时，以保证trading account的bar更新早于boundary
+	nextTs = nextTs.Add(time.Second * 2)
 
 	timer := time.NewTimer(nextTs.Sub(now))
 	ticker := time.NewTicker(sink.duration)
-	streamTimeout := time.NewTimer(time.Second * 2)
+	streamTimeout := time.NewTimer(time.Second * 3)
 
 	ticker.Stop()
 
@@ -251,6 +260,7 @@ func (sink *AccountSinker) run() {
 			if _, err := sink.acctSinker(sinkAccount); err != nil {
 				log.Print("Sink data failed:", err)
 			}
+			sink.accountCache[sinkAccount.InvestorID] = sinkAccount
 
 			currBar, exist := sink.barCache[sinkAccount.InvestorID]
 			if !exist {
