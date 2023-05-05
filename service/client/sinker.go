@@ -227,11 +227,11 @@ func (sink *AccountSinker) run() {
 		nextTs = nextTs.Add(sink.duration)
 	}
 	// 人为引入延时，以保证trading account的bar更新早于boundary
-	nextTs = nextTs.Add(time.Second * 2)
+	nextTs = nextTs.Add(time.Second)
 
 	timer := time.NewTimer(nextTs.Sub(now))
 	ticker := time.NewTicker(sink.duration)
-	streamTimeout := time.NewTimer(time.Second * 3)
+	streamTimeout := time.NewTimer(time.Second * 2)
 
 	ticker.Stop()
 
