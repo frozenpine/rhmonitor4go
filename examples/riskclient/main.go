@@ -276,6 +276,7 @@ func main() {
 
 	deadline, cancel = context.WithTimeout(rootCtx, time.Second*time.Duration(timeout))
 
+	log.Printf("Init remote risk api: %s:%d", riskSvrAddr, riskSvrPort)
 	if result, err = remote.Init(deadline, &service.Request{
 		Request: &service.Request_Front{
 			Front: &service.RiskServer{
@@ -302,6 +303,7 @@ func main() {
 	var (
 		sinkerPointer atomic.Pointer[client.AccountSinker]
 	)
+	log.Print("Subscribe remote broadcast.")
 	if broadcast, err := remote.SubBroadcast(rootCtx, &service.Request{
 		ApiIdentity: apiIdentity,
 	}); err != nil {
@@ -316,6 +318,7 @@ func main() {
 
 	deadline, cancel = context.WithTimeout(rootCtx, time.Second*time.Duration(timeout))
 
+	log.Printf("Request remote login: %s", riskUser)
 	if result, err = remote.ReqUserLogin(deadline, &service.Request{
 		ApiIdentity: apiIdentity,
 		Request: &service.Request_Login{
@@ -333,6 +336,7 @@ func main() {
 
 	deadline, cancel = context.WithTimeout(rootCtx, time.Second*time.Duration(timeout))
 
+	log.Print("Request query monitor accounts.")
 	if result, err = remote.ReqQryMonitorAccounts(deadline, &service.Request{
 		ApiIdentity: apiIdentity,
 	}); err != nil {
@@ -348,6 +352,7 @@ func main() {
 
 	var settleAccounts []*service.Account
 
+	log.Print("Request query investor money.")
 	if result, err = remote.ReqQryInvestorMoney(deadline, &service.Request{
 		ApiIdentity: apiIdentity,
 		// Request: &service.Request_Investor{
@@ -360,6 +365,7 @@ func main() {
 	}
 	cancel()
 
+	log.Print("Subscribe investor's money")
 	stream, err := remote.SubInvestorMoney(rootCtx, &service.Request{
 		ApiIdentity: apiIdentity,
 		// Request: &service.Request_Investor{
