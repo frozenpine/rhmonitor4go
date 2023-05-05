@@ -231,7 +231,8 @@ func (sink *AccountSinker) run() {
 
 	timer := time.NewTimer(nextTs.Sub(now))
 	ticker := time.NewTicker(sink.duration)
-	streamTimeout := time.NewTimer(time.Second * 2)
+	streamTimeout := time.NewTimer(sink.duration)
+	sink.boundaryFlag.Store(false)
 
 	ticker.Stop()
 
@@ -250,10 +251,6 @@ func (sink *AccountSinker) run() {
 		case <-streamTimeout.C:
 			sink.boundaryFlag.Store(false)
 		case acct := <-inputChan:
-			sink.boundaryFlag.Store(true)
-			streamTimeout.Stop()
-			streamTimeout.Reset(time.Second * 2)
-
 			sinkAccount := sink.newSinkAccount()
 			sinkAccount.FromAccount(acct)
 
@@ -334,6 +331,12 @@ func (sink *AccountSinker) run() {
 			sink.barCache[sinkAccount.InvestorID] = currBar
 
 			sink.output <- currBar
+
+			// if sinkAccount.Timestamp.Second() > 50 {
+			sink.boundaryFlag.Store(true)
+			streamTimeout.Stop()
+			streamTimeout.Reset(sink.duration)
+			// }
 		}
 	}
 }
