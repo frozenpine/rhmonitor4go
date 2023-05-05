@@ -181,6 +181,9 @@ func (sink *AccountSinker) boundary(ts time.Time) {
 		}
 
 		currBar.Timestamp = boundaryTs
+		currBar.Highest = currBar.Open
+		currBar.Lowest = currBar.Open
+		currBar.Close = currBar.Open
 
 		if _, err := sink.barSinker(currBar); err != nil {
 			log.Printf("Sink account bar failed: %+v", err)
