@@ -11,7 +11,6 @@ import (
 	"runtime"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 	"unsafe"
 
@@ -63,6 +62,22 @@ var (
 	}
 )
 
+func roundTS(ts time.Time, duration time.Duration, up bool) time.Time {
+	result := ts.Round(duration)
+
+	if up {
+		if result.Before(ts) {
+			return result.Add(duration)
+		}
+	} else {
+		if result.After(ts) {
+			return result.Add(-duration)
+		}
+	}
+
+	return result
+}
+
 type AccountSinker struct {
 	mode       BarMode
 	barSinker  func(*SinkAccountBar) (sql.Result, error)
@@ -76,7 +91,7 @@ type AccountSinker struct {
 
 	duration     time.Duration
 	settlements  sync.Map
-	boundaryFlag atomic.Bool
+	barTs        time.Time
 	barCache     map[string]*SinkAccountBar
 	accountCache map[string]*SinkAccount
 }
@@ -120,6 +135,7 @@ func NewAccountSinker(
 		duration:     dur,
 		accountPool:  sync.Pool{New: func() any { return new(SinkAccount) }},
 		barPool:      sync.Pool{New: func() any { return new(SinkAccountBar) }},
+		barTs:        roundTS(time.Now(), dur, true),
 		barCache:     make(map[string]*SinkAccountBar),
 		accountCache: make(map[string]*SinkAccount),
 	}
@@ -152,48 +168,41 @@ func (sink *AccountSinker) newSinkBar() *SinkAccountBar {
 	return data.(*SinkAccountBar)
 }
 
-// boundary 仅处理无实时账户流更新的bar数据
-func (sink *AccountSinker) boundary(ts time.Time) {
-	if !sink.boundaryFlag.Load() {
-		log.Print("No account stream input, stop bar boundary")
-		return
-	}
+// boundary 全部结算账号的bar数据入库
+func (sink *AccountSinker) boundary(boundaryTs time.Time) {
+	preTs := boundaryTs.Add(-sink.duration)
 
 	sink.settlements.Range(func(key, value any) bool {
 		accountID := key.(string)
 		settAccount := value.(*service.Account)
-		boundaryTs := ts.Round(sink.duration)
 
 		currBar, exist := sink.barCache[accountID]
 		if !exist {
-			currBar = &SinkAccountBar{
-				TradingDay: settAccount.TradingDay,
-				AccountID:  accountID,
-				Duration:   sink.duration.String(),
-				Open:       settAccount.PreBalance,
-				Highest:    settAccount.PreBalance,
-				Lowest:     settAccount.PreBalance,
-				Close:      settAccount.PreBalance,
-			}
+			// boundary触发时无资金信息更新的账户
+			currBar = sink.newSinkBar()
+
+			currBar.TradingDay = settAccount.TradingDay
+			currBar.AccountID = accountID
+			currBar.Duration = sink.duration.String()
+			currBar.Open = settAccount.PreBalance
+			currBar.Highest = settAccount.PreBalance
+			currBar.Lowest = settAccount.PreBalance
+			currBar.Close = settAccount.PreBalance
 
 			sink.barCache[accountID] = currBar
-		} else if currBar.Timestamp.After(boundaryTs) {
-			// 已由实时流触发更新bar数据
-			log.Printf("Bar[%s] @ %s updated by stream", accountID, boundaryTs)
-			return true
 		}
 
 		currBar.Timestamp = boundaryTs
-		// 实时资金流更新已停止
+		// 当前bar时间范围无资金流更新或不存在资金流数据
 		if acct, exist := sink.accountCache[accountID]; !exist ||
-			acct.Timestamp.Compare(boundaryTs.Add(-sink.duration)) <= 0 {
+			!acct.Timestamp.After(preTs) {
 			currBar.Highest = currBar.Open
 			currBar.Lowest = currBar.Open
 			currBar.Close = currBar.Open
 		}
 
 		if _, err := sink.barSinker(currBar); err != nil {
-			log.Printf("Sink account bar failed: %+v", err)
+			log.Printf("Sink bar data failed: %+v", err)
 		}
 
 		sink.output <- currBar
@@ -219,106 +228,109 @@ func (sink *AccountSinker) run() {
 			inputChan <- acct
 		}
 	}()
-
-	now := time.Now()
-	nextTs := now.Round(sink.duration)
-
-	if nextTs.Before(now) {
-		nextTs = nextTs.Add(sink.duration)
-	}
-	// 人为引入延时，以保证trading account的bar更新早于boundary
-	nextTs = nextTs.Add(time.Second)
-
-	timer := time.NewTimer(nextTs.Sub(now))
-	ticker := time.NewTicker(sink.duration)
 	streamTimeout := time.NewTimer(sink.duration)
-	sink.boundaryFlag.Store(false)
-
-	ticker.Stop()
+	streamTimeout.Stop()
 
 	for {
 		select {
 		case <-sink.ctx.Done():
 			return
-		case ts := <-timer.C:
-			log.Printf("Bar ticker first initialized: %+v", ts)
-			ticker.Reset(sink.duration)
-			timer.Stop()
-
-			sink.boundary(ts)
-		case ts := <-ticker.C:
-			sink.boundary(ts)
-		case <-streamTimeout.C:
-			sink.boundaryFlag.Store(false)
+		case ts := <-streamTimeout.C:
+			log.Printf("Account stream timeout: %+v", ts)
+			sink.boundary(roundTS(ts, sink.duration, false))
 		case acct := <-inputChan:
 			sinkAccount := sink.newSinkAccount()
 			sinkAccount.FromAccount(acct)
 
 			if _, err := sink.acctSinker(sinkAccount); err != nil {
-				log.Print("Sink data failed:", err)
+				log.Print("Sink account data failed:", err)
 			}
 			sink.accountCache[sinkAccount.InvestorID] = sinkAccount
 
-			currBar, exist := sink.barCache[sinkAccount.InvestorID]
-			if !exist {
-				ts := sinkAccount.Timestamp.Round(sink.duration)
-				if ts.Before(sinkAccount.Timestamp) {
-					ts = ts.Add(sink.duration)
+			if sinkAccount.Timestamp.After(sink.barTs) {
+				// 由资金流时间戳驱动全局bar boundary
+				nextTs := roundTS(sinkAccount.Timestamp, sink.duration, true)
+
+				if sink.barTs.Add(sink.duration).Equal(nextTs) {
+					sink.boundary(sink.barTs)
+
+					streamTimeout.Stop()
+					streamTimeout.Reset(sink.duration)
 				}
 
-				var price float64
+				sink.barTs = nextTs
+			}
+
+			currBar, exist := sink.barCache[sinkAccount.InvestorID]
+			if !exist {
+				// 程序启动账号的首笔资金更新
+				var preBalance float64
 
 				if sett, exist := sink.settlements.Load(sinkAccount.InvestorID); exist {
 					// 昨结算账户存在
-					price = sett.(*service.Account).PreBalance
+					preBalance = sett.(*service.Account).PreBalance
 				} else {
 					// 昨结算账户不存在，可能为实时上场新增账户，以账户 昨结算 + 入金 - 出金 作为初始资金
-					price = sinkAccount.PreBalance + sinkAccount.Deposit - sinkAccount.Withdraw
+					preBalance = sinkAccount.PreBalance + sinkAccount.Deposit - sinkAccount.Withdraw
+
+					// 新增一条结算记录，以触发后续的boundary更新
+					sink.settlements.Store(
+						sinkAccount.InvestorID,
+						&service.Account{
+							Investor: &service.Investor{
+								InvestorId: sinkAccount.InvestorID,
+							},
+							TradingDay: sinkAccount.TradingDay,
+							PreBalance: preBalance,
+						},
+					)
 				}
 
 				currBar = sink.newSinkBar()
 				currBar.TradingDay = sinkAccount.TradingDay
 				currBar.AccountID = sinkAccount.InvestorID
-				currBar.Timestamp = ts
+				currBar.Timestamp = sink.barTs
 				currBar.Duration = sink.duration.String()
-				currBar.Open = price
-				currBar.Highest = price
-				currBar.Lowest = price
-				currBar.Close = price
+				currBar.Open = preBalance
+				currBar.Highest = preBalance
+				currBar.Lowest = preBalance
+				currBar.Close = preBalance
+
+				sink.barCache[sinkAccount.InvestorID] = currBar
 			}
 
-			// bar切换
-			if sinkAccount.Timestamp.After(currBar.Timestamp) {
-				preBar := currBar
+			// bar切换实现到boundary
+			// if sinkAccount.Timestamp.After(currBar.Timestamp) {
+			// 	preBar := currBar
 
-				if _, err := sink.barSinker(preBar); err != nil {
-					log.Printf("Sink account bar failed: %+v", err)
-				}
+			// 	if _, err := sink.barSinker(preBar); err != nil {
+			// 		log.Printf("Sink account bar failed: %+v", err)
+			// 	}
 
-				currBar = sink.newSinkBar()
-				currBar.TradingDay = sinkAccount.TradingDay
-				ts := preBar.Timestamp.Add(sink.duration)
-				if sinkAccount.Timestamp.After(ts) {
-					if ts = sinkAccount.Timestamp.Round(sink.duration); sinkAccount.Timestamp.After(ts) {
-						ts = ts.Add(sink.duration)
-					}
-				}
-				currBar.Timestamp = ts
-				currBar.AccountID = sinkAccount.InvestorID
-				currBar.Duration = sink.duration.String()
+			// 	currBar = sink.newSinkBar()
+			// 	currBar.TradingDay = sinkAccount.TradingDay
+			// 	ts := preBar.Timestamp.Add(sink.duration)
+			// 	if sinkAccount.Timestamp.After(ts) {
+			// 		if ts = sinkAccount.Timestamp.Round(sink.duration); sinkAccount.Timestamp.After(ts) {
+			// 			ts = ts.Add(sink.duration)
+			// 		}
+			// 	}
+			// 	currBar.Timestamp = ts
+			// 	currBar.AccountID = sinkAccount.InvestorID
+			// 	currBar.Duration = sink.duration.String()
 
-				if sink.mode == FirstTick {
-					currBar.Open = sinkAccount.Balance
-					currBar.Highest = sinkAccount.Balance
-					currBar.Lowest = sinkAccount.Balance
-					currBar.Close = sinkAccount.Balance
-				} else {
-					currBar.Open = preBar.Close
-					currBar.Highest = preBar.Close
-					currBar.Lowest = preBar.Close
-					currBar.Close = preBar.Close
-				}
-			}
+			// 	if sink.mode == FirstTick {
+			// 		currBar.Open = sinkAccount.Balance
+			// 		currBar.Highest = sinkAccount.Balance
+			// 		currBar.Lowest = sinkAccount.Balance
+			// 		currBar.Close = sinkAccount.Balance
+			// 	} else {
+			// 		currBar.Open = preBar.Close
+			// 		currBar.Highest = preBar.Close
+			// 		currBar.Lowest = preBar.Close
+			// 		currBar.Close = preBar.Close
+			// 	}
+			// }
 
 			if sinkAccount.Balance > currBar.Highest {
 				currBar.Highest = sinkAccount.Balance
@@ -328,15 +340,7 @@ func (sink *AccountSinker) run() {
 
 			currBar.Close = sinkAccount.Balance
 
-			sink.barCache[sinkAccount.InvestorID] = currBar
-
 			sink.output <- currBar
-
-			// if sinkAccount.Timestamp.Second() > 50 {
-			sink.boundaryFlag.Store(true)
-			streamTimeout.Stop()
-			streamTimeout.Reset(sink.duration)
-			// }
 		}
 	}
 }

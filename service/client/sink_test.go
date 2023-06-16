@@ -1,4 +1,4 @@
-package client_test
+package client
 
 import (
 	"context"
@@ -6,16 +6,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/frozenpine/rhmonitor4go/service/client"
 	"github.com/vmihailenco/msgpack/v5"
 )
 
 func TestSink(t *testing.T) {
-	// if err := client.InitDB("sqlite3://trade.db"); err != nil {
+	// if err := InitDB("sqlite3://trade.db"); err != nil {
 	// 	t.Fatal(err)
 	// }
 
-	db, err := client.InitDB(
+	db, err := InitDB(
 		fmt.Sprintf(
 			"postgres://host=%s port=%d user=%s password=%s dbname=%s",
 			"localhost", 5432, "trade", "trade", "lingma",
@@ -26,12 +25,12 @@ func TestSink(t *testing.T) {
 	}
 	defer db.Close()
 
-	// sinker, err := client.InsertDB[client.SinkAccountBar](
+	// sinker, err := client.InsertDB[SinkAccountBar](
 	// 	context.TODO(), "trade.operation_account_kbar",
 	// 	"TradingDay", "AccountID", "Timestamp", "Duration",
 	// 	"Open", "Close", "Highest", "Lowest",
 	// )
-	sinker, err := client.InsertDB[client.SinkAccountBar](
+	sinker, err := InsertDB[SinkAccountBar](
 		context.TODO(), "operation_account_kbar",
 	)
 	if err != nil {
@@ -40,7 +39,7 @@ func TestSink(t *testing.T) {
 
 	now := time.Now()
 
-	if result, err := sinker(&client.SinkAccountBar{
+	if result, err := sinker(&SinkAccountBar{
 		TradingDay: now.Format("2006-01-02"),
 		AccountID:  "test",
 		Timestamp:  now.Round(time.Millisecond),
@@ -62,7 +61,7 @@ func TestSink(t *testing.T) {
 func TestMarshal(t *testing.T) {
 	now := time.Now()
 
-	acct := client.SinkAccount{
+	acct := SinkAccount{
 		InvestorID: "test",
 		TradingDay: now.Format("2006-01-02"),
 		Timestamp:  now,
@@ -83,7 +82,7 @@ func TestMarshal(t *testing.T) {
 		t.Log(buffer)
 	}
 
-	v := client.SinkAccount{}
+	v := SinkAccount{}
 	if err = msgpack.Unmarshal(buffer, &v); err != nil {
 		t.Fatal(err)
 	}
@@ -108,4 +107,30 @@ func TestDuration(t *testing.T) {
 
 	t.Log(time.ParseDuration("24h"))
 	t.Log(time.Hour * 24)
+}
+
+func TestRoundTS(t *testing.T) {
+	ts1, _ := time.Parse("2006-01-02 15:04:05", "2023-06-16 17:30:00")
+	ts2, _ := time.Parse("2006-01-02 15:04:05", "2023-06-16 17:29:01")
+	ts3, _ := time.Parse("2006-01-02 15:04:05", "2023-06-16 17:29:30")
+	ts4, _ := time.Parse("2006-01-02 15:04:05", "2023-06-16 17:29:31")
+
+	roundUp, _ := time.Parse("2006-01-02 15:04:05", "2023-06-16 17:30:00")
+	roundDown, _ := time.Parse("2006-01-02 15:04:05", "2023-06-16 17:29:00")
+
+	if !roundTS(ts1, time.Minute, true).Equal(
+		roundTS(ts1, time.Minute, false),
+	) {
+		t.Fatal("round exactly failed:", ts1)
+	}
+
+	for _, ts := range []time.Time{ts2, ts3, ts4} {
+		if !roundTS(ts, time.Minute, true).Equal(roundUp) {
+			t.Fatal("round up failed:", ts, roundUp)
+		}
+
+		if !roundTS(ts, time.Minute, false).Equal(roundDown) {
+			t.Fatal("round down failed:", ts, roundDown)
+		}
+	}
 }
