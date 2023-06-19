@@ -192,6 +192,7 @@ func (sink *AccountSinker) boundary(boundaryTs time.Time) {
 			sink.barCache[accountID] = currBar
 		}
 
+		currBar.TradingDay = settAccount.TradingDay
 		currBar.Timestamp = boundaryTs
 		// 当前bar时间范围无资金流更新或不存在资金流数据
 		if acct, exist := sink.accountCache[accountID]; !exist ||
@@ -199,13 +200,13 @@ func (sink *AccountSinker) boundary(boundaryTs time.Time) {
 			currBar.Highest = currBar.Open
 			currBar.Lowest = currBar.Open
 			currBar.Close = currBar.Open
+
+			sink.output <- currBar
 		}
 
 		if _, err := sink.barSinker(currBar); err != nil {
 			log.Printf("Sink bar data failed: %+v", err)
 		}
-
-		sink.output <- currBar
 
 		return true
 	})
@@ -299,38 +300,23 @@ func (sink *AccountSinker) run() {
 				sink.barCache[sinkAccount.InvestorID] = currBar
 			}
 
-			// bar切换实现到boundary
-			// if sinkAccount.Timestamp.After(currBar.Timestamp) {
-			// 	preBar := currBar
+			// bar数据切换
+			if sinkAccount.Timestamp.After(currBar.Timestamp) {
+				currBar.TradingDay = sinkAccount.TradingDay
+				currBar.Timestamp = sink.barTs
 
-			// 	if _, err := sink.barSinker(preBar); err != nil {
-			// 		log.Printf("Sink account bar failed: %+v", err)
-			// 	}
-
-			// 	currBar = sink.newSinkBar()
-			// 	currBar.TradingDay = sinkAccount.TradingDay
-			// 	ts := preBar.Timestamp.Add(sink.duration)
-			// 	if sinkAccount.Timestamp.After(ts) {
-			// 		if ts = sinkAccount.Timestamp.Round(sink.duration); sinkAccount.Timestamp.After(ts) {
-			// 			ts = ts.Add(sink.duration)
-			// 		}
-			// 	}
-			// 	currBar.Timestamp = ts
-			// 	currBar.AccountID = sinkAccount.InvestorID
-			// 	currBar.Duration = sink.duration.String()
-
-			// 	if sink.mode == FirstTick {
-			// 		currBar.Open = sinkAccount.Balance
-			// 		currBar.Highest = sinkAccount.Balance
-			// 		currBar.Lowest = sinkAccount.Balance
-			// 		currBar.Close = sinkAccount.Balance
-			// 	} else {
-			// 		currBar.Open = preBar.Close
-			// 		currBar.Highest = preBar.Close
-			// 		currBar.Lowest = preBar.Close
-			// 		currBar.Close = preBar.Close
-			// 	}
-			// }
+				if sink.mode == FirstTick {
+					currBar.Open = sinkAccount.Balance
+					currBar.Highest = sinkAccount.Balance
+					currBar.Lowest = sinkAccount.Balance
+					// currBar.Close = sinkAccount.Balance
+				} else {
+					currBar.Open = currBar.Close
+					currBar.Highest = currBar.Close
+					currBar.Lowest = currBar.Close
+					// currBar.Close = sinkAccount.Balance
+				}
+			}
 
 			if sinkAccount.Balance > currBar.Highest {
 				currBar.Highest = sinkAccount.Balance
