@@ -1,4 +1,4 @@
-package client
+package sinker
 
 import (
 	"time"
@@ -78,4 +78,34 @@ type SinkAccountBar struct {
 	Close      float64   `sql:"close" json:"close" msgpack:"close"`
 	Highest    float64   `sql:"high" json:"high" msgpack:"high"`
 	Lowest     float64   `sql:"low" json:"low" msgpack:"low"`
+}
+
+type SinkAccountPosition struct {
+	TradingDay   string  `sql:"trading_day" json:"trading_day" msgpack:"trading_day"`
+	AccountID    string  `sql:"account_id" json:"account_id" msgpack:"account_id"`
+	ProductID    string  `sql:"priduct_id" json:"product_id" msgpack:"product_id"`
+	InstrumentID string  `sql:"instrument_id" json:"instrument_id" msgpack:"instrument_id"`
+	HedgeFlag    string  `sql:"hedge_flag" json:"hedge_flag" msgpack:"hedge_flag"`
+	Diretion     string  `sql:"direction" json:"direction" msgpack:"direction"`
+	VolumeTotal  int     `sql:"volume_total" json:"volume_total" msgpack:"volume_total"`
+	Margin       float64 `sql:"margin" json:"margin" msgpack:"margin"`
+	AvgOpenPrice float64 `sql:"avg_open_price" json:"avg_open_price" msgpack:"avg_open_price"`
+	AvgPosPrice  float64 `sql:"avg_pos_price" json:"avg_pos_price" msgpack:"avg_pos_price"`
+	VolumeToday  int     `sql:"volume_today" json:"volume_today" msgpack:"volume_today"`
+	FrozenVolume int     `sql:"frozen_volume" json:"frozen_volume" msgpack:"frozen_volume"`
+}
+
+func (pos *SinkAccountPosition) FromPosition(value *service.Position, trading_day string) {
+	pos.TradingDay = trading_day
+	pos.AccountID = value.Investor.GetInvestorId()
+	pos.ProductID = value.GetProductId()
+	pos.InstrumentID = value.InstrumentId
+	pos.HedgeFlag = value.HedgeFlag.String()
+	pos.Diretion = value.Direction.String()
+	pos.VolumeTotal = int(value.Volume)
+	pos.Margin = value.Margin
+	pos.AvgOpenPrice = value.AvgOpenPriceByVol
+	pos.AvgPosPrice = value.AvgOpenPrice
+	pos.VolumeToday = int(value.TodayVolume)
+	pos.FrozenVolume = int(value.FrozenVolume)
 }

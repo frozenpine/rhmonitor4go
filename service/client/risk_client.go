@@ -32,6 +32,7 @@ type RHRiskClient struct {
 	riskUser    *service.RiskUser
 
 	cmd          *channel.MemoChannel[*Cli]
+	settlement   sync.Map
 	orderFlow    atomic.Pointer[channel.MemoChannel[*service.Order]]
 	tradeFlow    atomic.Pointer[channel.MemoChannel[*service.Trade]]
 	accountFlow  atomic.Pointer[channel.MemoChannel[*service.Account]]

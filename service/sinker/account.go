@@ -1,4 +1,4 @@
-package client
+package sinker
 
 import (
 	"context"
@@ -6,61 +6,48 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"reflect"
-	"regexp"
 	"runtime"
-	"strings"
 	"sync"
 	"time"
-	"unsafe"
-
-	_ "github.com/jackc/pgx/v5/stdlib"
-	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/frozenpine/rhmonitor4go/service"
 )
 
-const (
-	structuresSQL = `
--- ----------------------------
--- Table structure for operation_account_kbar
--- ----------------------------
-CREATE TABLE IF NOT EXISTS "operation_account_kbar" (
-"trading_day" DATE NOT NULL,
-"account_id" VARCHAR NOT NULL,
-"timestamp" TIMESTAMP NOT NULL,
-"duration" VARCHAR(255) NOT NULL,
-"open" FLOAT NOT NULL,
-"high" FLOAT NOT NULL,
-"low" FLOAT NOT NULL,
-"close" FLOAT NOT NULL,
-PRIMARY KEY ("trading_day", "account_id", "timestamp", "duration")
-);
+// const (
+// 	acctStructuresSQL = `
+// -- ----------------------------
+// -- Table structure for operation_account_kbar
+// -- ----------------------------
+// CREATE TABLE IF NOT EXISTS "operation_account_kbar" (
+// "trading_day" DATE NOT NULL,
+// "account_id" VARCHAR NOT NULL,
+// "timestamp" TIMESTAMPTZ	 NOT NULL,
+// "duration" VARCHAR(255) NOT NULL,
+// "open" FLOAT NOT NULL,
+// "high" FLOAT NOT NULL,
+// "low" FLOAT NOT NULL,
+// "close" FLOAT NOT NULL,
+// PRIMARY KEY ("trading_day", "account_id", "timestamp", "duration")
+// ) PARTITION BY RANGE(trading_day);
 
--- ----------------------------
--- Table structure for operation_trading_account
--- ----------------------------
-CREATE TABLE IF NOT EXISTS "operation_trading_account" (
-"trading_day" DATE NOT NULL,
-"account_id" VARCHAR NOT NULL,
-"timestamp" TIMESTAMP NOT NULL,
-"pre_balance" FLOAT NOT NULL,
-"balance" FLOAT NOT NULL,
-"deposit" FLOAT NOT NULL,
-"withdraw" FLOAT NOT NULL,
-"profit" FLOAT NOT NULL,
-"fee" FLOAT NOT NULL,
-"margin" FLOAT NOT NULL,
-"available" FLOAT NOT NULL,
-PRIMARY KEY ("trading_day", "account_id", "timestamp")
-);`
-)
-
-var (
-	driverMap = map[string]string{
-		"postgres": "pgx",
-	}
-)
+// -- ----------------------------
+// -- Table structure for operation_trading_account
+// -- ----------------------------
+// CREATE TABLE IF NOT EXISTS "operation_trading_account" (
+// "trading_day" DATE NOT NULL,
+// "account_id" VARCHAR NOT NULL,
+// "timestamp" TIMESTAMPTZ NOT NULL,
+// "pre_balance" FLOAT NOT NULL,
+// "balance" FLOAT NOT NULL,
+// "deposit" FLOAT NOT NULL,
+// "withdraw" FLOAT NOT NULL,
+// "profit" FLOAT NOT NULL,
+// "fee" FLOAT NOT NULL,
+// "margin" FLOAT NOT NULL,
+// "available" FLOAT NOT NULL,
+// PRIMARY KEY ("trading_day", "account_id", "timestamp")
+// ) PARTITION BY RANGE(trading_day);`
+// )
 
 func roundTS(ts time.Time, duration time.Duration, up bool) time.Time {
 	result := ts.Round(duration)
@@ -103,7 +90,7 @@ func NewAccountSinker(
 	src service.RohonMonitor_SubInvestorMoneyClient,
 ) (*AccountSinker, error) {
 	if src == nil || settlements == nil || len(settlements) == 0 {
-		return nil, errors.New("invalid sinker args")
+		return nil, ErrInvalidArgs
 	}
 
 	acctSinker, err := InsertDB[SinkAccount](
@@ -348,155 +335,4 @@ func (sink *AccountSinker) RenewSettle(acct *service.Account) error {
 	sink.settlements.Store(investor.InvestorId, acct)
 
 	return nil
-}
-
-var (
-	db          *sql.DB
-	connPattern = regexp.MustCompile(
-		"(?P<proto>(?:sqlite3|postgres|pgx))://(?P<value>.+)",
-	)
-)
-
-func InitDB(conn string) (c *sql.DB, err error) {
-	matchs := connPattern.FindStringSubmatch(conn)
-	if len(matchs) < 1 {
-		return nil, errors.New("invalid db conn string")
-	}
-
-	protoIdx := connPattern.SubexpIndex("proto")
-	valueIdx := connPattern.SubexpIndex("value")
-
-	var (
-		proto string
-		exist bool
-	)
-
-	if proto, exist = driverMap[matchs[protoIdx]]; !exist {
-		proto = matchs[protoIdx]
-	}
-
-	log.Print("Try to open db: ", conn)
-
-	if c, err = sql.Open(proto, matchs[valueIdx]); err != nil {
-		log.Fatalf("Parse database[%s] failed: %+v", conn, err)
-	} else if err = c.Ping(); err != nil {
-		log.Fatalf("Open database[%s] failed: %+v", conn, err)
-	}
-
-	if _, err = c.Exec(structuresSQL); err != nil {
-		log.Fatalf(
-			"Create table failed: %s, %s\n%s",
-			conn, err, structuresSQL,
-		)
-	}
-
-	db = c
-
-	return
-}
-
-type fieldOffset struct {
-	offset uintptr
-	typ    reflect.Type
-}
-
-func InsertDB[T any](
-	ctx context.Context,
-	tblName string,
-	argNames ...string,
-) (func(v *T) (sql.Result, error), error) {
-	if tblName == "" {
-		return nil, errors.New("no table name")
-	}
-
-	obj := new(T)
-	typ := reflect.TypeOf(obj).Elem()
-
-	argLen := len(argNames)
-
-	fieldOffsets := make([]fieldOffset, argLen)
-	sqlFields := make([]string, argLen)
-	argList := make([]string, argLen)
-
-	if argLen == 0 {
-		for i := 0; i < typ.NumField(); i++ {
-			field := typ.Field(i)
-			sqlField := field.Tag.Get("sql")
-
-			if sqlField == "" {
-				continue
-			}
-
-			fieldOffsets = append(fieldOffsets, fieldOffset{
-				offset: field.Offset,
-				typ:    field.Type,
-			})
-
-			sqlFields = append(sqlFields, sqlField)
-			argList = append(argList, fmt.Sprintf("$%d", i+1))
-		}
-	} else {
-		for idx, name := range argNames {
-			if field, ok := typ.FieldByName(name); !ok {
-				return nil, fmt.Errorf("%s has no field name: %s", typ.Name(), name)
-			} else {
-				sqlField := field.Tag.Get("sql")
-				if sqlField == "" {
-					return nil, fmt.Errorf("%s has no sql tag", field.Name)
-				}
-
-				fieldOffsets[idx] = fieldOffset{
-					offset: field.Offset,
-					typ:    field.Type,
-				}
-
-				sqlFields[idx] = sqlField
-				argList[idx] = fmt.Sprintf("$%d", idx+1)
-			}
-		}
-	}
-
-	sqlTpl := fmt.Sprintf(
-		"INSERT INTO %s(%s) VALUES (%s);",
-		tblName,
-		strings.Join(sqlFields, ","),
-		strings.Join(argList, ","),
-	)
-
-	getArgList := func(v interface{}) []interface{} {
-		basePtr := reflect.Indirect(reflect.ValueOf(v)).Addr().Pointer()
-
-		argList := []interface{}{}
-
-		for _, field := range fieldOffsets {
-			argList = append(
-				argList,
-				reflect.Indirect(reflect.NewAt(
-					field.typ, unsafe.Pointer(basePtr+field.offset),
-				)).Interface(),
-			)
-		}
-
-		return argList
-	}
-
-	// tx, err := db.Begin()
-
-	// insStmt, err := tx.Prepare(sqlTpl)
-	// if err != nil {
-	// 	log.Fatalf("Prepare sql \"%s\" failed: %+v", sqlTpl, err)
-	// }
-
-	return func(v *T) (sql.Result, error) {
-		values := getArgList(v)
-		// defer tx.Commit()
-
-		// log.Printf("Executing: %s, %s, %+v", sqlTpl, values, v)
-
-		c, cancel := context.WithCancel(ctx)
-		defer cancel()
-
-		return db.ExecContext(c, sqlTpl, values...)
-		// return insStmt.ExecContext(ctx, values...)
-	}, nil
 }

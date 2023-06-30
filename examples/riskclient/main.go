@@ -18,7 +18,7 @@ import (
 	"time"
 
 	"github.com/frozenpine/rhmonitor4go/service"
-	"github.com/frozenpine/rhmonitor4go/service/client"
+	"github.com/frozenpine/rhmonitor4go/service/sinker"
 	"github.com/go-redis/redis/v8"
 	"github.com/gogo/protobuf/proto"
 	"github.com/vmihailenco/msgpack/v5"
@@ -67,7 +67,7 @@ var (
 	redisSvr        = "localhost:6379#1"
 	redisSvrPattern = regexp.MustCompile("(?:(.+)@)?([a-z0-9A-Z.:].+)#([0-9]+)")
 	redisChanBase   = "rohon.risk.accounts"
-	redisFormat     = client.MsgPack
+	redisFormat     = sinker.MsgPack
 
 	barDuration = time.Minute
 
@@ -105,7 +105,7 @@ func reconnectedHandler(
 	ctx context.Context, cancel context.CancelFunc,
 	remote service.RohonMonitorClient, identity string,
 	broadcast service.RohonMonitor_SubBroadcastClient,
-	sinker *atomic.Pointer[client.AccountSinker],
+	sinker *atomic.Pointer[sinker.AccountSinker],
 ) {
 	if ctx == nil {
 		log.Fatal("Invalid context for reconnect handler")
@@ -189,7 +189,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	db, err := client.InitDB(dbConn)
+	db, err := sinker.InitDB(dbConn)
 	if err != nil {
 		log.Fatal("Init db failed:", err)
 	}
@@ -301,7 +301,7 @@ func main() {
 	}()
 
 	var (
-		sinkerPointer atomic.Pointer[client.AccountSinker]
+		sinkerPointer atomic.Pointer[sinker.AccountSinker]
 	)
 	log.Print("Subscribe remote broadcast.")
 	if broadcast, err := remote.SubBroadcast(rootCtx, &service.Request{
@@ -382,14 +382,14 @@ func main() {
 		marshaller func(any) ([]byte, error)
 	)
 
-	sinker, err := client.NewAccountSinker(rootCtx, client.Continuous, barDuration, settleAccounts, stream)
+	acctSinker, err := sinker.NewAccountSinker(rootCtx, sinker.Continuous, barDuration, settleAccounts, stream)
 	if err != nil {
 		log.Fatalf("Create sinker failed: %+v", err)
 	}
-	sinkerPointer.Store(sinker)
+	sinkerPointer.Store(acctSinker)
 
 	switch redisFormat {
-	case client.MsgProto3:
+	case sinker.MsgProto3:
 		marshaller = func(value any) ([]byte, error) {
 			data, ok := value.(proto.Message)
 			if !ok {
@@ -398,9 +398,9 @@ func main() {
 
 			return proto.Marshal(data)
 		}
-	case client.MsgJson:
+	case sinker.MsgJson:
 		marshaller = json.Marshal
-	case client.MsgPack:
+	case sinker.MsgPack:
 		marshaller = msgpack.Marshal
 	default:
 		log.Fatal("Unsupported message format: ", redisFormat)
@@ -410,7 +410,7 @@ func main() {
 		select {
 		case <-rootCtx.Done():
 			return
-		case bar := <-sinker.Data():
+		case bar := <-acctSinker.Data():
 			if buffer, err = marshaller(bar); err != nil {
 				log.Printf("Marshal account message failed: %s", err)
 				continue
