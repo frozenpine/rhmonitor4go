@@ -4,7 +4,7 @@ go 1.19
 
 require github.com/pkg/errors v0.9.1
 
-require golang.org/x/text v0.7.0
+require golang.org/x/text v0.9.0
 
 require (
 	github.com/frozenpine/msgqueue v0.0.2
@@ -15,7 +15,7 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.16
 	github.com/prometheus/client_golang v1.15.0
 	github.com/vmihailenco/msgpack/v5 v5.3.5
-	google.golang.org/grpc v1.53.0
+	google.golang.org/grpc v1.56.3
 	google.golang.org/protobuf v1.30.0
 )
 
@@ -32,7 +32,7 @@ require (
 	github.com/prometheus/procfs v0.9.0 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	golang.org/x/crypto v0.6.0 // indirect
-	golang.org/x/net v0.7.0 // indirect
-	golang.org/x/sys v0.6.0 // indirect
-	google.golang.org/genproto v0.0.0-20230110181048-76db0878b65f // indirect
+	golang.org/x/net v0.9.0 // indirect
+	golang.org/x/sys v0.7.0 // indirect
+	google.golang.org/genproto v0.0.0-20230410155749-daa745c078e1 // indirect
 )
